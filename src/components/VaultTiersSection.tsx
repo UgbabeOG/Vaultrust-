@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Check, KeyRound, Sparkles, Box, Lock, Landmark } from 'lucide-react';
+import { ShieldCheck, Check, KeyRound, Sparkles, Box, Lock, Landmark, CheckCircle2 } from 'lucide-react';
+import safeBoxesImage from '../assets/images/vault_tiers_safe_boxes_1791495338872.jpg';
 
 interface VaultTiersSectionProps {
   onSelectTier: (tierName: string) => void;
 }
 
 export const VaultTiersSection: React.FC<VaultTiersSectionProps> = ({ onSelectTier }) => {
-  const [selectedBilling, setSelectedBilling] = useState<'annual' | 'multi-year'>('annual');
   const [selectedFacility, setSelectedFacility] = useState('Zurich Bedrock');
 
   const tiers = [
@@ -69,7 +69,8 @@ export const VaultTiersSection: React.FC<VaultTiersSectionProps> = ({ onSelectTi
   return (
     <section id="vault-spaces" className="py-24 bg-[#0a0c10] border-t border-[#1c212c]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+        {/* Header & Facility Selector */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
           <div className="max-w-2xl">
             <div className="flex items-center gap-3 text-xs tracking-[0.2em] uppercase text-[#c5a059] font-medium mb-3">
               <span className="w-5 h-[1px] bg-[#c5a059]" />
@@ -99,6 +100,39 @@ export const VaultTiersSection: React.FC<VaultTiersSectionProps> = ({ onSelectTi
                 {facility}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Visual Showcase Banner for Safe Deposit Architecture */}
+        <div className="mb-12 rounded-sm overflow-hidden border border-[#232733] bg-[#0d0f15] grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          <div className="lg:col-span-7 h-64 sm:h-80 relative overflow-hidden">
+            <img
+              src={safeBoxesImage}
+              alt="Swiss private safe deposit boxes with precision gold keys and vault door in background"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-center brightness-[0.85] contrast-[1.05] hover:scale-105 transition-transform duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-transparent via-[#0d0f15]/20 to-[#0d0f15]" />
+          </div>
+          <div className="lg:col-span-5 p-6 sm:p-8 space-y-4">
+            <div className="flex items-center gap-2 text-xs text-[#c5a059] font-mono uppercase tracking-wider">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Modular Swiss Deposit Architecture</span>
+            </div>
+            <h3 className="font-display text-xl sm:text-2xl text-[#f5f5f7] font-normal leading-snug">
+              Precision Machined Titanium & Solid Brass Safe Lockers
+            </h3>
+            <p className="text-xs sm:text-sm text-[#9aa0b0] leading-relaxed">
+              Constructed inside hermetically sealed chambers behind 22-tonne blast doors. Each safe deposit box features custom velvet trays, individual tamper-evident seals, and zero shared mechanical keys.
+            </p>
+            <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-[#828899]">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Single-Client Bailment</span>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>Off-Balance Sheet Asset</span>
+            </div>
           </div>
         </div>
 

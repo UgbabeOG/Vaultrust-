@@ -23,6 +23,7 @@ import {
   VaultRecord,
   ShipmentRecord,
 } from '../data/mockCustodyData';
+import courierDispatchImage from '../assets/images/biometric_courier_dispatch_1791495350897.jpg';
 
 interface VaultSearchTrackerProps {
   onScheduleDispatch: (vaultId: string, preselectedItems?: string[]) => void;
@@ -353,54 +354,94 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
               </div>
             </div>
 
-            {/* Checkpoint Timeline */}
+            {/* Checkpoint Timeline & Visual Courier Escort Section */}
             <div className="p-6 sm:p-8">
-              <h4 className="font-display text-lg font-normal text-[#f5f5f7] mb-6">
-                Chain of Custody & Real-Time Checkpoints
-              </h4>
-
-              <div className="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-[11px] sm:before:left-[15px] before:top-2 before:bottom-2 before:w-[2px] before:bg-[#202533]">
-                {activeRecord.shipment.checkpoints.map((checkpoint, idx) => (
-                  <div key={idx} className="relative">
-                    {/* Stepper Dot */}
-                    <div
-                      className={`absolute -left-[23px] sm:-left-[27px] top-1 w-6 h-6 rounded-full flex items-center justify-center ${
-                        checkpoint.completed
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
-                          : idx === activeRecord.shipment!.checkpoints.findIndex((c) => !c.completed)
-                          ? 'bg-[#c5a059]/20 text-[#c5a059] border border-[#c5a059] animate-pulse'
-                          : 'bg-[#151922] text-[#4d5467] border border-[#262c3a]'
-                      }`}
-                    >
-                      {checkpoint.completed ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      ) : (
-                        <Clock className="w-3.5 h-3.5" />
-                      )}
-                    </div>
-
-                    {/* Step details */}
-                    <div className="bg-[#0a0c10] border border-[#232733] p-4 rounded-sm">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
-                        <span className="font-medium text-sm text-[#f5f5f7]">
-                          {checkpoint.status}
-                        </span>
-                        <span className="font-mono text-xs text-[#828899]">
-                          {checkpoint.time}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#a0a6b7] flex items-center gap-1.5 mb-1">
-                        <MapPin className="w-3 h-3 text-[#c5a059]" />
-                        <span>{checkpoint.location}</span>
-                      </p>
-                      {checkpoint.notes && (
-                        <p className="text-xs text-[#6e7587] mt-1.5 pt-1.5 border-t border-[#181c26]">
-                          {checkpoint.notes}
-                        </p>
-                      )}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left: Armored Courier Photographic Card */}
+                <div className="lg:col-span-5 rounded-sm overflow-hidden border border-[#232733] bg-[#090b0f]">
+                  <div className="relative aspect-[4/3] overflow-hidden">
+                    <img
+                      src={courierDispatchImage}
+                      alt="Armed courier loading biometric GPS-tracked titanium case into armored vehicle"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover object-center brightness-[0.88] contrast-[1.05]"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#090b0f] via-transparent to-transparent opacity-80" />
+                    <div className="absolute bottom-3 left-3 right-3 text-xs">
+                      <span className="text-[10px] uppercase font-mono tracking-wider text-[#7aa2f7] block">
+                        Chain of Custody Protocol
+                      </span>
+                      <span className="font-semibold text-[#f5f5f7] text-xs block">
+                        Dual-Biometric Sealed Titanium Case
+                      </span>
                     </div>
                   </div>
-                ))}
+                  <div className="p-4 space-y-2 text-xs border-t border-[#1a1e28]">
+                    <div className="flex justify-between text-[#828899]">
+                      <span>Convoy Unit:</span>
+                      <span className="font-mono text-[#f5f5f7]">{activeRecord.shipment.securityTeamCallsign}</span>
+                    </div>
+                    <div className="flex justify-between text-[#828899]">
+                      <span>Lead Custodian:</span>
+                      <span className="text-[#f5f5f7]">{activeRecord.shipment.leadCourier}</span>
+                    </div>
+                    <div className="flex justify-between text-[#828899] pt-1 border-t border-[#161a24]">
+                      <span>Biometric Seals:</span>
+                      <span className="text-emerald-400 font-medium">100% Cryptographic Lock Intact</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Checkpoint Timeline */}
+                <div className="lg:col-span-7">
+                  <h4 className="font-display text-lg font-normal text-[#f5f5f7] mb-6">
+                    Chain of Custody & Real-Time Checkpoints
+                  </h4>
+
+                  <div className="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-[11px] sm:before:left-[15px] before:top-2 before:bottom-2 before:w-[2px] before:bg-[#202533]">
+                    {activeRecord.shipment.checkpoints.map((checkpoint, idx) => (
+                      <div key={idx} className="relative">
+                        {/* Stepper Dot */}
+                        <div
+                          className={`absolute -left-[23px] sm:-left-[27px] top-1 w-6 h-6 rounded-full flex items-center justify-center ${
+                            checkpoint.completed
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                              : idx === activeRecord.shipment!.checkpoints.findIndex((c) => !c.completed)
+                              ? 'bg-[#c5a059]/20 text-[#c5a059] border border-[#c5a059] animate-pulse'
+                              : 'bg-[#151922] text-[#4d5467] border border-[#262c3a]'
+                          }`}
+                        >
+                          {checkpoint.completed ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <Clock className="w-3.5 h-3.5" />
+                          )}
+                        </div>
+
+                        {/* Step details */}
+                        <div className="bg-[#0a0c10] border border-[#232733] p-4 rounded-sm">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
+                            <span className="font-medium text-sm text-[#f5f5f7]">
+                              {checkpoint.status}
+                            </span>
+                            <span className="font-mono text-xs text-[#828899]">
+                              {checkpoint.time}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#a0a6b7] flex items-center gap-1.5 mb-1">
+                            <MapPin className="w-3 h-3 text-[#c5a059]" />
+                            <span>{checkpoint.location}</span>
+                          </p>
+                          {checkpoint.notes && (
+                            <p className="text-xs text-[#6e7587] mt-1.5 pt-1.5 border-t border-[#181c26]">
+                              {checkpoint.notes}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

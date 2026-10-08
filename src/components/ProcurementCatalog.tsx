@@ -1,6 +1,7 @@
 import React from 'react';
 import { BULLION_CATALOG } from '../data/mockCustodyData';
-import { ShieldCheck, Truck, Lock, ArrowRight, Gem, Scale, Award } from 'lucide-react';
+import { ShieldCheck, Truck, Lock, ArrowRight, Gem, Scale, Award, Sparkles } from 'lucide-react';
+import diamondsCollectionImg from '../assets/images/flawless_diamonds_collection_1791495361301.jpg';
 
 interface ProcurementCatalogProps {
   onAcquireItem: (item: (typeof BULLION_CATALOG)[0], actionType: 'vault' | 'ship') => void;
@@ -11,7 +12,7 @@ export const ProcurementCatalog: React.FC<ProcurementCatalogProps> = ({ onAcquir
     <section id="procurement" className="py-24 bg-[#08090b] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
           <div className="max-w-2xl">
             <div className="flex items-center gap-3 text-xs tracking-[0.2em] uppercase text-[#c5a059] font-medium mb-3">
               <span className="w-5 h-[1px] bg-[#c5a059]" />
@@ -28,6 +29,42 @@ export const ProcurementCatalog: React.FC<ProcurementCatalogProps> = ({ onAcquir
           <div className="text-xs text-[#727a8d] flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>LBMA & Rapaport Live Spot Indicative Pricing</span>
+          </div>
+        </div>
+
+        {/* Spotlight Showcase Banner: Investment Diamonds & Bullion Desk */}
+        <div className="mb-12 rounded-sm overflow-hidden border border-[#232733] bg-[#0c0e14] grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          <div className="lg:col-span-5 p-6 sm:p-8 space-y-4 order-2 lg:order-1">
+            <div className="flex items-center gap-2 text-xs text-[#c5a059] font-mono uppercase tracking-wider">
+              <Gem className="w-3.5 h-3.5" />
+              <span>Certified Primary Bourse Allocation</span>
+            </div>
+            <h3 className="font-display text-xl sm:text-2xl text-[#f5f5f7] font-normal leading-snug">
+              Type IIa Chemical Purity & Flawless Rough-to-Cut Specie
+            </h3>
+            <p className="text-xs sm:text-sm text-[#9aa0b0] leading-relaxed">
+              All diamonds acquired through Valtrust Sentinel Global are verified under laser Raman spectroscopy with full GIA dossiers and Kimberley Process provenance. Allocate them directly into your insured safe deposit drawer upon trade confirmation.
+            </p>
+            <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
+              <span className="px-3 py-1 bg-[#141822] border border-[#252b3a] text-[#d1d5e0] rounded-sm">
+                0% Vault Transfer Fee
+              </span>
+              <span className="px-3 py-1 bg-[#141822] border border-[#252b3a] text-[#d1d5e0] rounded-sm">
+                Immediate Lloyd's In-Vault Binder
+              </span>
+            </div>
+          </div>
+          <div className="lg:col-span-7 h-64 sm:h-80 relative overflow-hidden order-1 lg:order-2">
+            <img
+              src={diamondsCollectionImg}
+              alt="Flawless brilliant, emerald, radiant, and pear cut investment diamonds on dark obsidian stone pedestal"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-center brightness-[0.9] contrast-[1.05] hover:scale-105 transition-transform duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-l from-transparent via-[#0c0e14]/20 to-[#0c0e14]" />
+            <div className="absolute bottom-3 right-3 text-[11px] font-mono text-[#c5a059] bg-black/70 px-2.5 py-1 rounded-sm border border-[#2b3140]">
+              GIA Certified · D / Flawless Lot
+            </div>
           </div>
         </div>
 
