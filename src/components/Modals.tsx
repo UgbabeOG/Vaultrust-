@@ -1,0 +1,523 @@
+import React, { useState } from 'react';
+import { X, CheckCircle2, ShieldCheck, Truck, Lock, KeyRound, Sparkles } from 'lucide-react';
+import { BULLION_CATALOG } from '../data/mockCustodyData';
+
+interface ReserveModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  preselectedTier?: string;
+}
+
+export const ReserveModal: React.FC<ReserveModalProps> = ({
+  isOpen,
+  onClose,
+  preselectedTier = 'Class II Depository Drawer (Zurich Bedrock)',
+}) => {
+  const [facility, setFacility] = useState('Zurich Bedrock Depository');
+  const [tier, setTier] = useState(preselectedTier);
+  const [assetType, setAssetType] = useState('Gold Bullion & Diamonds');
+  const [estValue, setEstValue] = useState('$5,000,000 USD');
+  const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [generatedRef, setGeneratedRef] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientName || !clientEmail) return;
+    const ref = `VSG-RES-${Math.floor(1000 + Math.random() * 9000)}`;
+    setGeneratedRef(ref);
+    setSubmitted(true);
+  };
+
+  const handleReset = () => {
+    setSubmitted(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-lg bg-[#0f121a] border border-[#2b3140] rounded-sm p-6 sm:p-8 shadow-2xl text-[#f5f5f7]">
+        <button
+          onClick={handleReset}
+          className="absolute top-5 right-5 text-[#737b8d] hover:text-[#f5f5f7] transition-colors"
+          aria-label="Close Modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {!submitted ? (
+          <div>
+            <div className="flex items-center gap-2 text-xs tracking-[0.2em] uppercase text-[#c5a059] font-medium mb-2">
+              <KeyRound className="w-4 h-4" />
+              <span>Private Vault Allocation</span>
+            </div>
+            <h3 className="font-display text-2xl text-[#f5f5f7] mb-2">
+              Reserve Depository Space
+            </h3>
+            <p className="text-xs text-[#8e95a5] mb-6 leading-relaxed">
+              Initiate a confidential allocation request. A Valtrust Senior Custody Director will coordinate biometric enrollment and safe-hand key delivery.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[#82899b] mb-1 font-medium">Selected Depository Facility</label>
+                <select
+                  value={facility}
+                  onChange={(e) => setFacility(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-sm text-[#f5f5f7]"
+                >
+                  <option value="Zurich Bedrock Depository (Switzerland)">Zurich Bedrock Depository (Switzerland)</option>
+                  <option value="London Mayfair Safe Depository (UK)">London Mayfair Safe Depository (UK)</option>
+                  <option value="Singapore Freeport Depository (Singapore)">Singapore Freeport Depository (Singapore)</option>
+                  <option value="Geneva SafePort Vault (Switzerland)">Geneva SafePort Vault (Switzerland)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Vault Allocation Tier</label>
+                  <select
+                    value={tier}
+                    onChange={(e) => setTier(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-xs text-[#f5f5f7]"
+                  >
+                    <option value="Class I Safe Deposit Box">Class I Safe Deposit Box ($3,800/yr)</option>
+                    <option value="Class II Depository Drawer">Class II Depository Drawer ($7,900/yr)</option>
+                    <option value="Class III Fortress Chamber">Class III Fortress Chamber (Bespoke)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Estimated Insured Specie</label>
+                  <select
+                    value={estValue}
+                    onChange={(e) => setEstValue(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-xs text-[#f5f5f7]"
+                  >
+                    <option value="$1,000,000 - $3,000,000 USD">$1,000,000 - $3,000,000 USD</option>
+                    <option value="$3,000,000 - $10,000,000 USD">$3,000,000 - $10,000,000 USD</option>
+                    <option value="$10,000,000 - $50,000,000 USD">$10,000,000 - $50,000,000 USD</option>
+                    <option value="$50,000,000+ USD (Sovereign Tier)">$50,000,000+ USD (Sovereign Tier)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[#82899b] mb-1 font-medium">Client / Representative Full Legal Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="e.g. Lord Alexander Sinclair / Sinclair Family Trust"
+                  className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-sm text-[#f5f5f7] placeholder:text-[#52596b]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Confidential Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    placeholder="client@familyoffice.com"
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-xs text-[#f5f5f7] placeholder:text-[#52596b]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Encrypted Phone / Signal</label>
+                  <input
+                    type="tel"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    placeholder="+41 22 819 0000"
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-xs text-[#f5f5f7] placeholder:text-[#52596b]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[#1e2330]">
+                <button
+                  type="submit"
+                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] rounded-sm transition-all"
+                >
+                  Submit Confidential Reservation
+                </button>
+                <p className="text-[11px] text-[#555d6f] text-center mt-2">
+                  Protected by Swiss Bank Secrecy standards and end-to-end zero-knowledge protocols.
+                </p>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="py-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h3 className="font-display text-2xl text-[#f5f5f7]">
+              Reservation Dossier Registered
+            </h3>
+            <p className="text-xs text-[#9aa0b0] max-w-sm mx-auto leading-relaxed">
+              Your confidential reservation dossier has been assigned to our Zurich Senior Custody Registrar.
+            </p>
+            <div className="p-4 bg-[#090b0f] border border-[#232733] rounded-sm max-w-xs mx-auto text-xs space-y-1">
+              <span className="text-[#687082] block text-[11px]">Reservation Reference Code:</span>
+              <span className="font-mono text-base font-semibold text-[#c5a059] tracking-wider block">
+                {generatedRef}
+              </span>
+              <span className="text-[10px] text-emerald-400 block mt-1">Status: Pending Director Review</span>
+            </div>
+            <div className="pt-2">
+              <button
+                onClick={handleReset}
+                className="px-6 py-2.5 text-xs font-medium text-[#08090b] bg-[#c5a059] rounded-sm"
+              >
+                Return to Depository
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface DispatchModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  vaultId?: string;
+  onDispatchConfirmed?: (trackingCode: string) => void;
+}
+
+export const DispatchModal: React.FC<DispatchModalProps> = ({
+  isOpen,
+  onClose,
+  vaultId = 'VSG-VLT-8842',
+  onDispatchConfirmed,
+}) => {
+  const [destination, setDestination] = useState('');
+  const [escortLevel, setEscortLevel] = useState('Level 5 Armed Convoy');
+  const [recipientName, setRecipientName] = useState('');
+  const [safeHandKey, setSafeHandKey] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('Earliest Immediate Window');
+  const [confirmedTracking, setConfirmedTracking] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!destination || !recipientName) return;
+    const trk = `TRK-ARM-${Math.floor(1000 + Math.random() * 9000)}`;
+    setConfirmedTracking(trk);
+    if (onDispatchConfirmed) {
+      onDispatchConfirmed(trk);
+    }
+  };
+
+  const handleReset = () => {
+    setConfirmedTracking('');
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-lg bg-[#0f121a] border border-[#2b3140] rounded-sm p-6 sm:p-8 shadow-2xl text-[#f5f5f7]">
+        <button
+          onClick={handleReset}
+          className="absolute top-5 right-5 text-[#737b8d] hover:text-[#f5f5f7] transition-colors"
+          aria-label="Close Modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {!confirmedTracking ? (
+          <div>
+            <div className="flex items-center gap-2 text-xs tracking-[0.2em] uppercase text-[#7aa2f7] font-medium mb-2">
+              <Truck className="w-4 h-4" />
+              <span>Guarded Logistics Protocol</span>
+            </div>
+            <h3 className="font-display text-2xl text-[#f5f5f7] mb-2">
+              Schedule Armored Safe-Hand Dispatch
+            </h3>
+            <p className="text-xs text-[#8e95a5] mb-6 leading-relaxed">
+              Order physical extraction and guarded transport from vault <span className="font-mono text-[#c5a059]">{vaultId}</span> directly to your designated destination.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[#82899b] mb-1 font-medium">Source Depository Compartment</label>
+                <div className="w-full px-3 py-2 bg-[#08090b] border border-[#232733] rounded-sm font-mono text-sm text-[#c5a059]">
+                  {vaultId} (Allocated Segregated Assets)
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[#82899b] mb-1 font-medium">Escort & Carrier Protocol *</label>
+                <select
+                  value={escortLevel}
+                  onChange={(e) => setEscortLevel(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-xs text-[#f5f5f7]"
+                >
+                  <option value="Level 5 Armed Convoy">Level 5 Armed Convoy (B7 Armored Vehicles, Dual Guard Escort)</option>
+                  <option value="Guarded Diplomatic Air Courier">Guarded Diplomatic Air Courier (Executive Jet / Airside Tarmac)</option>
+                  <option value="Armored Maritime Escort">Armored Maritime Escort (Superyacht Berth / Heli-Handoff)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[#82899b] mb-1 font-medium">Delivery Destination Address or Coordinates *</label>
+                <input
+                  type="text"
+                  required
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  placeholder="e.g. Private Residence, Suvretta House, St. Moritz OR Nice Airport FBO"
+                  className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-sm text-[#f5f5f7] placeholder:text-[#52596b]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Authorized Recipient Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    placeholder="Full name of signee"
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-xs text-[#f5f5f7] placeholder:text-[#52596b]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Safe-Hand Verification Passcode</label>
+                  <input
+                    type="text"
+                    value={safeHandKey}
+                    onChange={(e) => setSafeHandKey(e.target.value)}
+                    placeholder="e.g. ALPHA-992-SEC"
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-xs text-[#f5f5f7] placeholder:text-[#52596b]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[#1e2330]">
+                <button
+                  type="submit"
+                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] rounded-sm transition-all"
+                >
+                  Confirm & Dispatch Armored Transport
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="py-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/40 text-blue-400 mx-auto flex items-center justify-center">
+              <Truck className="w-6 h-6" />
+            </div>
+            <h3 className="font-display text-2xl text-[#f5f5f7]">
+              Armored Transit Dispatched
+            </h3>
+            <p className="text-xs text-[#9aa0b0] max-w-sm mx-auto leading-relaxed">
+              Extraction protocol initiated under dual-biometric signoff. Your convoy is scheduled for dispatch.
+            </p>
+            <div className="p-4 bg-[#090b0f] border border-[#232733] rounded-sm max-w-xs mx-auto text-xs space-y-1">
+              <span className="text-[#687082] block text-[11px]">Active Tracking Waybill:</span>
+              <span className="font-mono text-base font-semibold text-[#7aa2f7] tracking-wider block">
+                {confirmedTracking}
+              </span>
+              <span className="text-[10px] text-blue-400 block mt-1">Escort Unit Assigned & En Route</span>
+            </div>
+            <div className="pt-2 flex justify-center gap-3">
+              <button
+                onClick={handleReset}
+                className="px-6 py-2.5 text-xs font-medium text-[#08090b] bg-[#c5a059] rounded-sm"
+              >
+                Track in Custody Portal
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface ProcureModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  item: (typeof BULLION_CATALOG)[0] | null;
+  actionType: 'vault' | 'ship';
+}
+
+export const ProcureModal: React.FC<ProcureModalProps> = ({
+  isOpen,
+  onClose,
+  item,
+  actionType,
+}) => {
+  const [quantity, setQuantity] = useState(1);
+  const [destAddress, setDestAddress] = useState('');
+  const [buyerName, setBuyerName] = useState('');
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const [completed, setCompleted] = useState(false);
+  const [orderRef, setOrderRef] = useState('');
+
+  if (!isOpen || !item) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!buyerName || !buyerEmail) return;
+    setOrderRef(`VSG-ORD-${Math.floor(1000 + Math.random() * 9000)}`);
+    setCompleted(true);
+  };
+
+  const handleReset = () => {
+    setCompleted(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-lg bg-[#0f121a] border border-[#2b3140] rounded-sm p-6 sm:p-8 shadow-2xl text-[#f5f5f7]">
+        <button
+          onClick={handleReset}
+          className="absolute top-5 right-5 text-[#737b8d] hover:text-[#f5f5f7] transition-colors"
+          aria-label="Close Modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {!completed ? (
+          <div>
+            <div className="flex items-center gap-2 text-xs tracking-[0.2em] uppercase text-[#c5a059] font-medium mb-2">
+              <Lock className="w-4 h-4" />
+              <span>Sovereign Asset Procurement</span>
+            </div>
+            <h3 className="font-display text-2xl text-[#f5f5f7] mb-1">
+              Acquisition: {item.title}
+            </h3>
+            <p className="text-xs text-[#8e95a5] mb-6 leading-relaxed">
+              {actionType === 'vault'
+                ? 'Item will be directly allocated and stored in your private depository vault.'
+                : 'Item will be dispatched via armored safe-hand courier directly to your address.'}
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div className="p-3 bg-[#08090b] border border-[#232733] rounded-sm space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[#6c7486]">Spot Reference Quotation:</span>
+                  <span className="font-mono text-[#f5f5f7] font-semibold">{item.spotReference}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6c7486]">Purity & Provenance:</span>
+                  <span className="text-[#d1d5e0]">{item.purity} · {item.origin}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-sm text-[#f5f5f7]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Custodial Mandate</label>
+                  <div className="px-3 py-2 bg-[#08090b] border border-[#232733] rounded-sm text-[#c5a059] font-medium">
+                    {actionType === 'vault' ? 'Direct Vault Allocation' : 'Armored Doorstep Delivery'}
+                  </div>
+                </div>
+              </div>
+
+              {actionType === 'ship' && (
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Delivery Destination Address *</label>
+                  <input
+                    type="text"
+                    required
+                    value={destAddress}
+                    onChange={(e) => setDestAddress(e.target.value)}
+                    placeholder="Private Estate, Hotel Villa, or Private Hangar address..."
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-sm text-[#f5f5f7]"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Buyer / Entity Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={buyerName}
+                    onChange={(e) => setBuyerName(e.target.value)}
+                    placeholder="Full legal title"
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-sm text-[#f5f5f7]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#82899b] mb-1 font-medium">Secure Contact Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={buyerEmail}
+                    onChange={(e) => setBuyerEmail(e.target.value)}
+                    placeholder="email@domain.com"
+                    className="w-full px-3 py-2.5 bg-[#08090b] border border-[#232733] focus:border-[#c5a059] focus:outline-none rounded-sm text-sm text-[#f5f5f7]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[#1e2330]">
+                <button
+                  type="submit"
+                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] rounded-sm transition-all"
+                >
+                  Submit Sovereign Procurement Order
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="py-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h3 className="font-display text-2xl text-[#f5f5f7]">
+              Procurement Order Received
+            </h3>
+            <p className="text-xs text-[#9aa0b0] max-w-sm mx-auto leading-relaxed">
+              Spot price locked. Your allocated refinery bars/gems will be settled directly with your custody manager.
+            </p>
+            <div className="p-4 bg-[#090b0f] border border-[#232733] rounded-sm max-w-xs mx-auto text-xs space-y-1">
+              <span className="text-[#687082] block text-[11px]">Order Reference:</span>
+              <span className="font-mono text-base font-semibold text-[#c5a059] tracking-wider block">
+                {orderRef}
+              </span>
+              <span className="text-[10px] text-emerald-400 block mt-1">Allocation Lock Confirmed</span>
+            </div>
+            <div className="pt-2">
+              <button
+                onClick={handleReset}
+                className="px-6 py-2.5 text-xs font-medium text-[#08090b] bg-[#c5a059] rounded-sm"
+              >
+                Close & Return
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

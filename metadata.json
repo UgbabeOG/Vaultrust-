@@ -1,0 +1,6 @@
+{
+  "name": "Valtrust Sentinel Global",
+  "description": "Premier private security firm offering sovereign-grade vault storage, fine bullion & diamond procurement, and armored worldwide transit.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
