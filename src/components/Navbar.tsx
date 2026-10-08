@@ -24,6 +24,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch, onOpenReserve }) =
 
         {/* Zone 2: 4-6 text navigation links */}
         <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-[#9ba1b0]">
+          <a href="#gallery" className="hover:text-[#f5f5f7] transition-colors py-1">
+            Depository Gallery
+          </a>
           <a href="#services" className="hover:text-[#f5f5f7] transition-colors py-1">
             Custody Services
           </a>
@@ -35,9 +38,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch, onOpenReserve }) =
           </a>
           <a href="#vault-spaces" className="hover:text-[#f5f5f7] transition-colors py-1">
             Depository Tiers
-          </a>
-          <a href="#sanctuary" className="hover:text-[#f5f5f7] transition-colors py-1">
-            Private Salons
           </a>
         </nav>
 
@@ -81,6 +81,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch, onOpenReserve }) =
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-[#232733] bg-[#0c0e13] px-6 py-6 space-y-4">
           <nav className="flex flex-col space-y-3 text-sm font-medium text-[#b5bac7]">
+            <a
+              href="#gallery"
+              onClick={() => setMobileMenuOpen(false)}
+              className="py-1 hover:text-[#faebd7]"
+            >
+              Depository Gallery
+            </a>
             <a
               href="#services"
               onClick={() => setMobileMenuOpen(false)}

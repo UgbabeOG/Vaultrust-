@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
+import { DepositoryCarousel } from './components/DepositoryCarousel';
 import { VaultSearchTracker } from './components/VaultSearchTracker';
 import { ThreePillarsSection } from './components/ThreePillarsSection';
 import { ProcurementCatalog } from './components/ProcurementCatalog';
@@ -23,6 +24,13 @@ export default function App() {
 
   const scrollToTracker = () => {
     const el = document.getElementById('tracker');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const scrollToProcurement = () => {
+    const el = document.getElementById('procurement');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
@@ -67,12 +75,22 @@ export default function App() {
           onScrollToTracker={scrollToTracker}
         />
 
+        {/* Depository Operations Carousel & Image Showcase */}
+        <div id="gallery">
+          <DepositoryCarousel
+            onReserve={() => handleOpenReserve('Class II Depository Drawer (Zurich Bedrock)')}
+            onSalon={() => {
+              setReserveTier('Private Salon Booking (Swiss Depository)');
+              setIsReserveOpen(true);
+            }}
+            onDispatch={() => setIsDispatchOpen(true)}
+            onProcure={scrollToProcurement}
+          />
+        </div>
+
         {/* The Three Pillars: Buy · Store · Ship */}
         <ThreePillarsSection
-          onOpenProcurement={() => {
-            const el = document.getElementById('procurement');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }}
+          onOpenProcurement={scrollToProcurement}
           onOpenReserve={() => handleOpenReserve()}
           onOpenDispatch={() => setIsDispatchOpen(true)}
         />
@@ -116,7 +134,6 @@ export default function App() {
         onClose={() => setIsDispatchOpen(false)}
         vaultId={dispatchVaultId}
         onDispatchConfirmed={(trackingCode) => {
-          // You can automatically update or notify
           scrollToTracker();
         }}
       />

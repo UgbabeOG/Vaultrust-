@@ -114,7 +114,9 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenReserve }) =
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-[#c5a059] shrink-0" />
-                <span>custody@valtrustsentinel.com</span>
+                <a href="mailto:valtrustsentinelglobal@gmail.com" className="hover:text-[#faebd7] transition-colors">
+                  valtrustsentinelglobal@gmail.com
+                </a>
               </div>
               <div className="text-[11px] text-[#555d6e] pt-1">
                 PGP Fingerprint: 4F92 B710 E83A 9C01
