@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, ShieldCheck, Truck, Lock, KeyRound, Sparkles } from 'lucide-react';
 import { BULLION_CATALOG } from '../data/mockCustodyData';
+import { submitReservation, submitDispatch, submitProcurement } from '../services/api';
 
 interface ReserveModalProps {
   isOpen: boolean;
@@ -13,28 +14,54 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
   onClose,
   preselectedTier = 'Class II Depository Drawer (Zurich Bedrock)',
 }) => {
-  const [facility, setFacility] = useState('Zurich Bedrock Depository');
+  const [facility, setFacility] = useState('Zurich Bedrock Depository (Switzerland)');
   const [tier, setTier] = useState(preselectedTier);
   const [assetType, setAssetType] = useState('Gold Bullion & Diamonds');
   const [estValue, setEstValue] = useState('$5,000,000 USD');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [generatedRef, setGeneratedRef] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName || !clientEmail) return;
-    const ref = `VSG-RES-${Math.floor(1000 + Math.random() * 9000)}`;
-    setGeneratedRef(ref);
-    setSubmitted(true);
+    if (!clientName.trim() || !clientEmail.trim()) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      const response = await submitReservation({
+        facility,
+        tier,
+        assetType,
+        estValue,
+        clientName,
+        clientEmail,
+        clientPhone,
+      });
+
+      if (response.success) {
+        setGeneratedRef(response.referenceCode);
+        setSubmitted(true);
+      } else {
+        setErrorMessage(response.message || 'Reservation submission failed.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Connection error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
     setSubmitted(false);
+    setErrorMessage('');
     onClose();
   };
 
@@ -61,6 +88,12 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
             <p className="text-xs text-[#8e95a5] mb-6 leading-relaxed">
               Initiate a confidential allocation request. A Valtrust Senior Custody Director will coordinate biometric enrollment and safe-hand key delivery.
             </p>
+
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-950/40 border border-red-500/50 rounded-sm text-xs text-red-300">
+                {errorMessage}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
@@ -144,9 +177,17 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
               <div className="pt-4 border-t border-[#1e2330]">
                 <button
                   type="submit"
-                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] rounded-sm transition-all"
+                  disabled={isSubmitting}
+                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] disabled:opacity-75 rounded-sm transition-all flex items-center justify-center gap-2"
                 >
-                  Submit Confidential Reservation
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-[#08090b] border-t-transparent rounded-full animate-spin" />
+                      <span>Transmitting Dossier to Backend API...</span>
+                    </>
+                  ) : (
+                    <span>Submit Confidential Reservation</span>
+                  )}
                 </button>
                 <p className="text-[11px] text-[#555d6f] text-center mt-2">
                   Protected by Swiss Bank Secrecy standards and end-to-end zero-knowledge protocols.
@@ -163,7 +204,7 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
               Reservation Dossier Registered
             </h3>
             <p className="text-xs text-[#9aa0b0] max-w-sm mx-auto leading-relaxed">
-              Your confidential reservation dossier has been assigned to our Zurich Senior Custody Registrar.
+              Your confidential reservation dossier has been assigned to our Zurich Senior Custody Registrar and logged into the depository backend.
             </p>
             <div className="p-4 bg-[#090b0f] border border-[#232733] rounded-sm max-w-xs mx-auto text-xs space-y-1">
               <span className="text-[#687082] block text-[11px]">Reservation Reference Code:</span>
@@ -172,6 +213,9 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
               </span>
               <span className="text-[10px] text-emerald-400 block mt-1">Status: Pending Director Review</span>
             </div>
+            <p className="text-[11px] text-[#788194]">
+              Custody Director dispatch will confirm to {clientEmail} (contact desk: valtrustsentinelglobal@gmail.com).
+            </p>
             <div className="pt-2">
               <button
                 onClick={handleReset}
@@ -204,23 +248,46 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
   const [escortLevel, setEscortLevel] = useState('Level 5 Armed Convoy');
   const [recipientName, setRecipientName] = useState('');
   const [safeHandKey, setSafeHandKey] = useState('');
-  const [scheduledDate, setScheduledDate] = useState('Earliest Immediate Window');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedTracking, setConfirmedTracking] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!destination || !recipientName) return;
-    const trk = `TRK-ARM-${Math.floor(1000 + Math.random() * 9000)}`;
-    setConfirmedTracking(trk);
-    if (onDispatchConfirmed) {
-      onDispatchConfirmed(trk);
+    if (!destination.trim() || !recipientName.trim()) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      const response = await submitDispatch({
+        vaultId,
+        destination,
+        escortLevel,
+        recipientName,
+        safeHandKey,
+      });
+
+      if (response.success) {
+        setConfirmedTracking(response.trackingNumber);
+        if (onDispatchConfirmed) {
+          onDispatchConfirmed(response.trackingNumber);
+        }
+      } else {
+        setErrorMessage(response.message || 'Dispatch request failed.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Connection error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleReset = () => {
     setConfirmedTracking('');
+    setErrorMessage('');
     onClose();
   };
 
@@ -247,6 +314,12 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
             <p className="text-xs text-[#8e95a5] mb-6 leading-relaxed">
               Order physical extraction and guarded transport from vault <span className="font-mono text-[#c5a059]">{vaultId}</span> directly to your designated destination.
             </p>
+
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-950/40 border border-red-500/50 rounded-sm text-xs text-red-300">
+                {errorMessage}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
@@ -308,9 +381,17 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
               <div className="pt-4 border-t border-[#1e2330]">
                 <button
                   type="submit"
-                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] rounded-sm transition-all"
+                  disabled={isSubmitting}
+                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] disabled:opacity-75 rounded-sm transition-all flex items-center justify-center gap-2"
                 >
-                  Confirm & Dispatch Armored Transport
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-[#08090b] border-t-transparent rounded-full animate-spin" />
+                      <span>Scheduling Convoy via API...</span>
+                    </>
+                  ) : (
+                    <span>Confirm & Dispatch Armored Transport</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -324,7 +405,7 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
               Armored Transit Dispatched
             </h3>
             <p className="text-xs text-[#9aa0b0] max-w-sm mx-auto leading-relaxed">
-              Extraction protocol initiated under dual-biometric signoff. Your convoy is scheduled for dispatch.
+              Extraction protocol initiated under dual-biometric signoff. Active tracking waybill registered in backend database.
             </p>
             <div className="p-4 bg-[#090b0f] border border-[#232733] rounded-sm max-w-xs mx-auto text-xs space-y-1">
               <span className="text-[#687082] block text-[11px]">Active Tracking Waybill:</span>
@@ -365,20 +446,47 @@ export const ProcureModal: React.FC<ProcureModalProps> = ({
   const [destAddress, setDestAddress] = useState('');
   const [buyerName, setBuyerName] = useState('');
   const [buyerEmail, setBuyerEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [orderRef, setOrderRef] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   if (!isOpen || !item) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!buyerName || !buyerEmail) return;
-    setOrderRef(`VSG-ORD-${Math.floor(1000 + Math.random() * 9000)}`);
-    setCompleted(true);
+    if (!buyerName.trim() || !buyerEmail.trim()) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      const response = await submitProcurement({
+        itemId: item.id,
+        title: item.title,
+        quantity,
+        actionType,
+        destAddress,
+        buyerName,
+        buyerEmail,
+      });
+
+      if (response.success) {
+        setOrderRef(response.orderRef);
+        setCompleted(true);
+      } else {
+        setErrorMessage(response.message || 'Procurement order failed.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Connection error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
     setCompleted(false);
+    setErrorMessage('');
     onClose();
   };
 
@@ -407,6 +515,12 @@ export const ProcureModal: React.FC<ProcureModalProps> = ({
                 ? 'Item will be directly allocated and stored in your private depository vault.'
                 : 'Item will be dispatched via armored safe-hand courier directly to your address.'}
             </p>
+
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-950/40 border border-red-500/50 rounded-sm text-xs text-red-300">
+                {errorMessage}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div className="p-3 bg-[#08090b] border border-[#232733] rounded-sm space-y-1.5">
@@ -482,9 +596,17 @@ export const ProcureModal: React.FC<ProcureModalProps> = ({
               <div className="pt-4 border-t border-[#1e2330]">
                 <button
                   type="submit"
-                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] rounded-sm transition-all"
+                  disabled={isSubmitting}
+                  className="w-full py-3 text-xs font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] disabled:opacity-75 rounded-sm transition-all flex items-center justify-center gap-2"
                 >
-                  Submit Sovereign Procurement Order
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-[#08090b] border-t-transparent rounded-full animate-spin" />
+                      <span>Locking Order in Depository...</span>
+                    </>
+                  ) : (
+                    <span>Submit Sovereign Procurement Order</span>
+                  )}
                 </button>
               </div>
             </form>

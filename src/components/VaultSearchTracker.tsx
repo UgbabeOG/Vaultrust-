@@ -17,40 +17,68 @@ import {
   Package,
 } from 'lucide-react';
 import {
-  lookupCustodyRecord,
-  SAMPLE_VAULTS,
-  SAMPLE_SHIPMENTS,
   VaultRecord,
   ShipmentRecord,
 } from '../data/mockCustodyData';
+import { searchVaultOrShipment } from '../services/api';
 import courierDispatchImage from '../assets/images/biometric_courier_dispatch_1791495350897.jpg';
 
 interface VaultSearchTrackerProps {
   onScheduleDispatch: (vaultId: string, preselectedItems?: string[]) => void;
   onRequestSalonVisit: (vaultId: string) => void;
+  externalQuery?: string;
 }
 
 export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
   onScheduleDispatch,
   onRequestSalonVisit,
+  externalQuery,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('VSG-VLT-8842');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [activeRecord, setActiveRecord] = useState<{
-    type: 'vault' | 'shipment' | 'not_found';
+    type: 'vault' | 'shipment' | 'not_found' | 'idle';
     vault?: VaultRecord;
     shipment?: ShipmentRecord;
-  }>(() => lookupCustodyRecord('VSG-VLT-8842'));
+  }>({ type: 'idle' });
 
-  const handleSearch = (e?: React.FormEvent) => {
+  // Sync externalQuery if passed from dispatch confirmation or admin update
+  React.useEffect(() => {
+    if (externalQuery) {
+      handleSearchById(externalQuery);
+    }
+  }, [externalQuery]);
+
+  const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const res = lookupCustodyRecord(searchQuery);
-    setActiveRecord(res);
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const res = await searchVaultOrShipment(searchQuery.trim());
+      setActiveRecord({
+        type: res.type,
+        vault: res.vault,
+        shipment: res.shipment,
+      });
+    } finally {
+      setIsSearching(false);
+    }
   };
 
-  const handleQuickSelect = (id: string) => {
+  const handleSearchById = async (id: string) => {
     setSearchQuery(id);
-    const res = lookupCustodyRecord(id);
-    setActiveRecord(res);
+    setIsSearching(true);
+    try {
+      const res = await searchVaultOrShipment(id);
+      setActiveRecord({
+        type: res.type,
+        vault: res.vault,
+        shipment: res.shipment,
+      });
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -87,60 +115,19 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
             </div>
             <button
               type="submit"
-              className="px-6 py-3 text-xs sm:text-sm font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] rounded-sm transition-all duration-200 whitespace-nowrap"
+              disabled={isSearching}
+              className="px-6 py-3 text-xs sm:text-sm font-semibold tracking-wider uppercase text-[#08090b] bg-gradient-to-r from-[#d8b873] to-[#c5a059] hover:from-[#faebd7] hover:to-[#d8b873] disabled:opacity-75 rounded-sm transition-all duration-200 whitespace-nowrap flex items-center justify-center gap-2"
             >
-              Verify & Track
+              {isSearching ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-[#08090b] border-t-transparent rounded-full animate-spin" />
+                  <span>Verifying API...</span>
+                </>
+              ) : (
+                <span>Verify & Track</span>
+              )}
             </button>
           </form>
-
-          {/* Quick presets for user exploration */}
-          <div className="mt-4 pt-3 border-t border-[#1a1f2c] flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-[#6d7588] font-medium mr-1">Quick Query Presets:</span>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('VSG-VLT-8842')}
-              className={`px-2.5 py-1 rounded-sm border transition-colors ${
-                searchQuery === 'VSG-VLT-8842'
-                  ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#faebd7]'
-                  : 'border-[#262c3a] bg-[#0c0e13] text-[#9da3b3] hover:border-[#40495f]'
-              }`}
-            >
-              <span className="font-mono text-[#c5a059]">VSG-VLT-8842</span> (Zurich Vault · Gold & Diamonds)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('VSG-VLT-9021')}
-              className={`px-2.5 py-1 rounded-sm border transition-colors ${
-                searchQuery === 'VSG-VLT-9021'
-                  ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#faebd7]'
-                  : 'border-[#262c3a] bg-[#0c0e13] text-[#9da3b3] hover:border-[#40495f]'
-              }`}
-            >
-              <span className="font-mono text-[#c5a059]">VSG-VLT-9021</span> (London Mayfair · Horology)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('TRK-ARM-7729')}
-              className={`px-2.5 py-1 rounded-sm border transition-colors ${
-                searchQuery === 'TRK-ARM-7729'
-                  ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#faebd7]'
-                  : 'border-[#262c3a] bg-[#0c0e13] text-[#9da3b3] hover:border-[#40495f]'
-              }`}
-            >
-              <span className="font-mono text-[#7aa2f7]">TRK-ARM-7729</span> (Alpine Armored Convoy)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('TRK-AIR-4105')}
-              className={`px-2.5 py-1 rounded-sm border transition-colors ${
-                searchQuery === 'TRK-AIR-4105'
-                  ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#faebd7]'
-                  : 'border-[#262c3a] bg-[#0c0e13] text-[#9da3b3] hover:border-[#40495f]'
-              }`}
-            >
-              <span className="font-mono text-[#7aa2f7]">TRK-AIR-4105</span> (Guarded Airside Jet Transfer)
-            </button>
-          </div>
         </div>
 
         {/* Dynamic Result Panels */}
@@ -447,6 +434,43 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
           </div>
         )}
 
+        {/* Idle State: Awaiting Client Query */}
+        {activeRecord.type === 'idle' && (
+          <div className="bg-[#10131a] border border-[#232733] rounded-sm p-8 sm:p-12 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#181d28] border border-[#c5a059]/30 text-[#c5a059] mx-auto mb-4 flex items-center justify-center">
+              <Search className="w-5 h-5" />
+            </div>
+            <h3 className="font-display text-xl sm:text-2xl text-[#f5f5f7] mb-2">
+              Awaiting Custodial Identifier
+            </h3>
+            <p className="text-sm text-[#8f96a8] max-w-lg mx-auto mb-6 leading-relaxed">
+              Input your unique Vault Allocation Code or Armored Waybill Tracking Number into the console above to inspect physical assets, tamper seals, and encrypted satellite transit telemetry.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto text-left text-xs">
+              <div className="p-4 bg-[#090b0f] border border-[#1e2330] rounded-sm space-y-1">
+                <div className="flex items-center gap-2 text-[#c5a059] font-medium">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Vault Allocation Format</span>
+                </div>
+                <p className="font-mono text-[#d1d5e0]">VSG-VLT-XXXX</p>
+                <p className="text-[11px] text-[#6d7588]">
+                  Enables real-time review of segregated bullion, certified diamonds, and Lloyd's specie policies.
+                </p>
+              </div>
+              <div className="p-4 bg-[#090b0f] border border-[#1e2330] rounded-sm space-y-1">
+                <div className="flex items-center gap-2 text-[#7aa2f7] font-medium">
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Transit Waybill Format</span>
+                </div>
+                <p className="font-mono text-[#d1d5e0]">TRK-ARM-XXXX</p>
+                <p className="text-[11px] text-[#6d7588]">
+                  Streams live waypoints, escort security callsigns, and safe-hand courier arrival windows.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Not Found state */}
         {activeRecord.type === 'not_found' && (
           <div className="bg-[#12151c] border border-[#2b3140] rounded-sm p-8 text-center">
@@ -454,17 +478,12 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
             <h3 className="font-display text-xl text-[#f5f5f7] mb-2">
               No Depository Record Found
             </h3>
-            <p className="text-sm text-[#8f96a8] max-w-md mx-auto mb-6">
+            <p className="text-sm text-[#8f96a8] max-w-md mx-auto mb-4">
               Please verify the Vault Code or Armored Waybill number provided by your Valtrust private banker or custody director.
             </p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => handleQuickSelect('VSG-VLT-8842')}
-                className="px-4 py-2 text-xs font-medium text-[#08090b] bg-[#c5a059] rounded-sm"
-              >
-                Load Sample Zurich Vault
-              </button>
-            </div>
+            <p className="text-xs text-[#6e7587]">
+              Format: <span className="font-mono text-[#c5a059]">VSG-VLT-XXXX</span> for vaults · <span className="font-mono text-[#7aa2f7]">TRK-ARM-XXXX</span> for transit shipments
+            </p>
           </div>
         )}
       </div>

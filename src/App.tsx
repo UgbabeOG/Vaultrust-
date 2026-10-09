@@ -9,14 +9,17 @@ import { VaultTiersSection } from './components/VaultTiersSection';
 import { PrivateSalonExperience } from './components/PrivateSalonExperience';
 import { Footer } from './components/Footer';
 import { ReserveModal, DispatchModal, ProcureModal } from './components/Modals';
+import { AdminPortal } from './components/AdminPortal';
 import { BULLION_CATALOG } from './data/mockCustodyData';
 
 export default function App() {
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isReserveOpen, setIsReserveOpen] = useState(false);
   const [reserveTier, setReserveTier] = useState('Class II Depository Drawer (Zurich Bedrock)');
 
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
   const [dispatchVaultId, setDispatchVaultId] = useState('VSG-VLT-8842');
+  const [trackerQuery, setTrackerQuery] = useState<string | undefined>(undefined);
 
   const [isProcureOpen, setIsProcureOpen] = useState(false);
   const [procureItem, setProcureItem] = useState<(typeof BULLION_CATALOG)[0] | null>(null);
@@ -66,6 +69,7 @@ export default function App() {
       <Navbar
         onOpenSearch={scrollToTracker}
         onOpenReserve={() => handleOpenReserve()}
+        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       <main className="flex-grow">
@@ -99,6 +103,7 @@ export default function App() {
         <VaultSearchTracker
           onScheduleDispatch={handleScheduleDispatch}
           onRequestSalonVisit={handleRequestSalonVisit}
+          externalQuery={trackerQuery}
         />
 
         {/* Precious Metals & Rare Diamonds Procurement Desk */}
@@ -120,6 +125,7 @@ export default function App() {
       <Footer
         onOpenSearch={scrollToTracker}
         onOpenReserve={() => handleOpenReserve()}
+        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       {/* Interactive Modals */}
@@ -134,6 +140,7 @@ export default function App() {
         onClose={() => setIsDispatchOpen(false)}
         vaultId={dispatchVaultId}
         onDispatchConfirmed={(trackingCode) => {
+          setTrackerQuery(trackingCode);
           scrollToTracker();
         }}
       />
@@ -143,6 +150,16 @@ export default function App() {
         onClose={() => setIsProcureOpen(false)}
         item={procureItem}
         actionType={procureAction}
+      />
+
+      {/* Registrar Admin Command Portal (Full CRUD) */}
+      <AdminPortal
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+        onVaultOrShipmentUpdated={(id) => {
+          setTrackerQuery(id);
+          scrollToTracker();
+        }}
       />
     </div>
   );

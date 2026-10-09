@@ -4,9 +4,10 @@ import { Shield, Lock, MapPin, Phone, Mail } from 'lucide-react';
 interface FooterProps {
   onOpenSearch: () => void;
   onOpenReserve: () => void;
+  onOpenAdmin?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenReserve }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenReserve, onOpenAdmin }) => {
   return (
     <footer className="bg-[#060709] border-t border-[#181b24] text-[#8e95a5] text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -130,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenReserve }) =
           <div>
             © {new Date().getFullYear()} Valtrust Sentinel Global AG. All rights reserved. Registered private security depository.
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-6">
             <a href="#" className="hover:text-[#9aa0b0] transition-colors">
               Jurisdictional Secrecy
             </a>
@@ -140,6 +141,14 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenReserve }) =
             <a href="#" className="hover:text-[#9aa0b0] transition-colors">
               Chain-of-Custody Protocols
             </a>
+            {onOpenAdmin && (
+              <button
+                onClick={onOpenAdmin}
+                className="text-[#c5a059] hover:text-[#faebd7] transition-colors flex items-center gap-1 font-mono"
+              >
+                <span>[Registrar Admin Console]</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

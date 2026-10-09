@@ -16,8 +16,8 @@ export interface VaultRecord {
   vaultNumber: string;
   facility: string;
   country: string;
-  tier: 'Class I Lockbox' | 'Class II Depository Drawer' | 'Class III Fortress Chamber';
-  status: 'Allocated & Sealed' | 'Under Scheduled Audit' | 'Accessible by Custodian';
+  tier: 'Class I Lockbox' | 'Class I Safe Deposit Box' | 'Class II Depository Drawer' | 'Class III Fortress Chamber' | string;
+  status: 'Allocated & Sealed' | 'Under Scheduled Audit' | 'Accessible by Custodian' | string;
   securityRating: string;
   insuranceUnderwriter: string;
   coverageLimit: string;
@@ -44,8 +44,8 @@ export interface ShipmentRecord {
   manifestDescription: string;
   originFacility: string;
   destination: string;
-  courierLevel: 'Level 5 Armed Convoy' | 'Guarded Diplomatic Air Courier' | 'Armored Maritime Escort';
-  transitStatus: 'In Transit' | 'Cleared Customs / Apron Transfer' | 'Dispatched Final Mile' | 'Delivered & Handed Over';
+  courierLevel: 'Level 5 Armed Convoy' | 'Guarded Diplomatic Air Courier' | 'Armored Maritime Escort' | string;
+  transitStatus: 'In Transit' | 'Cleared Customs / Apron Transfer' | 'Dispatched Final Mile' | 'Delivered & Handed Over' | string;
   currentCheckpoint: string;
   estimatedDelivery: string;
   securityTeamCallsign: string;
