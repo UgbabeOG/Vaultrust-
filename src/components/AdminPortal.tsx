@@ -201,7 +201,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           setVaults((prev) => prev.filter((v) => v.id !== id));
           if (editingVault?.id === id) setEditingVault(null);
           if (managingItemsVault?.id === id) setManagingItemsVault(null);
-          showFeedback(`Vault ${id} successfully de-allocated.`);
+          showFeedback(res.storage === 'browser'
+            ? `Vault ${id} removed on this device only; the server API is unavailable.`
+            : `Vault ${id} successfully de-allocated.`);
         } else {
           showFeedback(res.error || 'Failed to delete vault', 'error');
         }
@@ -211,7 +213,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           setShipments((prev) => prev.filter((s) => s.id !== id && s.trackingNumber !== id));
           if (editingShipment?.id === id) setEditingShipment(null);
           if (checkpointShipment?.id === id) setCheckpointShipment(null);
-          showFeedback(`Shipment ${id} archived.`);
+          showFeedback(res.storage === 'browser'
+            ? `Shipment ${id} removed on this device only; the server API is unavailable.`
+            : `Shipment ${id} archived.`);
         } else {
           showFeedback(res.error || 'Failed to delete shipment', 'error');
         }

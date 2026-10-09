@@ -8,6 +8,8 @@ import {
 
 const browserVaultsKey = 'vaultrust-admin-vaults';
 const browserShipmentsKey = 'vaultrust-admin-shipments';
+const deletedVaultsKey = 'vaultrust-admin-deleted-vaults';
+const deletedShipmentsKey = 'vaultrust-admin-deleted-shipments';
 
 function readBrowserRecords<T extends { id: string }>(key: string): T[] {
   if (typeof window === 'undefined') return [];
@@ -19,21 +21,37 @@ function readBrowserRecords<T extends { id: string }>(key: string): T[] {
   }
 }
 
-function saveBrowserRecord<T extends { id: string }>(key: string, record: T): boolean {
+function saveBrowserRecord<T extends { id: string }>(key: string, record: T, deletedKey: string): boolean {
   if (typeof window === 'undefined') return false;
   try {
     const records = readBrowserRecords<T>(key).filter((item) => item.id !== record.id);
     window.localStorage.setItem(key, JSON.stringify([record, ...records]));
+    const deletedIds = readBrowserRecords<{ id: string }>(deletedKey).filter((item) => item.id !== record.id);
+    window.localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
     return true;
   } catch {
     return false;
   }
 }
 
-function mergeRecords<T extends { id: string }>(serverRecords: T[], browserRecords: T[]): T[] {
-  const recordsById = new Map(browserRecords.map((record) => [record.id, record]));
+function deleteBrowserRecord<T extends { id: string }>(recordsKey: string, deletedKey: string, id: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const deletedIds = readBrowserRecords<{ id: string }>(deletedKey).filter((record) => record.id !== id);
+    window.localStorage.setItem(deletedKey, JSON.stringify([{ id }, ...deletedIds]));
+    const records = readBrowserRecords<T>(recordsKey).filter((record) => record.id !== id);
+    window.localStorage.setItem(recordsKey, JSON.stringify(records));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function mergeRecords<T extends { id: string }>(serverRecords: T[], browserRecords: T[], deletedIds: { id: string }[]): T[] {
+  const deleted = new Set(deletedIds.map((record) => record.id.toUpperCase()));
+  const recordsById = new Map(browserRecords.filter((record) => !deleted.has(record.id.toUpperCase())).map((record) => [record.id, record]));
   for (const record of serverRecords) {
-    if (!recordsById.has(record.id)) recordsById.set(record.id, record);
+    if (!deleted.has(record.id.toUpperCase()) && !recordsById.has(record.id)) recordsById.set(record.id, record);
   }
   return [...recordsById.values()];
 }
@@ -64,7 +82,7 @@ function createBrowserVault(vaultData: Partial<VaultRecord>) {
     items: vaultData.items || [],
   };
 
-  return saveBrowserRecord(browserVaultsKey, vault)
+  return saveBrowserRecord(browserVaultsKey, vault, deletedVaultsKey)
     ? { success: true, vault, storage: 'browser' as const }
     : { success: false, error: 'Browser storage is unavailable. The vault could not be saved.' };
 }
@@ -111,7 +129,7 @@ function createBrowserShipment(shipmentData: Partial<ShipmentRecord>) {
     ],
   };
 
-  return saveBrowserRecord(browserShipmentsKey, shipment)
+  return saveBrowserRecord(browserShipmentsKey, shipment, deletedShipmentsKey)
     ? { success: true, shipment, storage: 'browser' as const }
     : { success: false, error: 'Browser storage is unavailable. The shipment could not be saved.' };
 }
@@ -312,7 +330,11 @@ export async function adminGetVaults(): Promise<{ success: boolean; vaults: Vaul
       if (data.success && Array.isArray(data.vaults)) {
         return {
           success: true,
-          vaults: mergeRecords(data.vaults, readBrowserRecords<VaultRecord>(browserVaultsKey)),
+          vaults: mergeRecords(
+            data.vaults,
+            readBrowserRecords<VaultRecord>(browserVaultsKey),
+            readBrowserRecords<{ id: string }>(deletedVaultsKey),
+          ),
         };
       }
     }
@@ -321,7 +343,11 @@ export async function adminGetVaults(): Promise<{ success: boolean; vaults: Vaul
   }
   return {
     success: true,
-    vaults: mergeRecords(SAMPLE_VAULTS, readBrowserRecords<VaultRecord>(browserVaultsKey)),
+    vaults: mergeRecords(
+      SAMPLE_VAULTS,
+      readBrowserRecords<VaultRecord>(browserVaultsKey),
+      readBrowserRecords<{ id: string }>(deletedVaultsKey),
+    ),
   };
 }
 
@@ -334,7 +360,7 @@ export async function adminCreateVault(vaultData: Partial<VaultRecord>): Promise
     });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.success && data.vault) {
-      saveBrowserRecord(browserVaultsKey, data.vault);
+      saveBrowserRecord(browserVaultsKey, data.vault, deletedVaultsKey);
       return { ...data, storage: 'server' };
     }
     if (res.status === 404 || res.status >= 500 || !data) return createBrowserVault(vaultData);
@@ -357,14 +383,26 @@ export async function adminUpdateVault(id: string, updates: Partial<VaultRecord>
   }
 }
 
-export async function adminDeleteVault(id: string): Promise<{ success: boolean; error?: string }> {
+export async function adminDeleteVault(id: string): Promise<{ success: boolean; error?: string; storage?: 'server' | 'browser' }> {
   try {
     const res = await fetch(`/api/admin/vaults/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
-    return await res.json();
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Network error' };
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success) {
+      deleteBrowserRecord<VaultRecord>(browserVaultsKey, deletedVaultsKey, id);
+      return { ...data, storage: 'server' };
+    }
+    if (!data || res.status === 404 || res.status >= 500) {
+      return deleteBrowserRecord<VaultRecord>(browserVaultsKey, deletedVaultsKey, id)
+        ? { success: true, storage: 'browser' }
+        : { success: false, error: 'The server API is unavailable and this device could not record the deletion.' };
+    }
+    return { success: false, error: data.error || 'Vault could not be deleted.' };
+  } catch {
+    return deleteBrowserRecord<VaultRecord>(browserVaultsKey, deletedVaultsKey, id)
+      ? { success: true, storage: 'browser' }
+      : { success: false, error: 'The server API is unavailable and this device could not record the deletion.' };
   }
 }
 
@@ -401,7 +439,11 @@ export async function adminGetShipments(): Promise<{ success: boolean; shipments
       if (data.success && Array.isArray(data.shipments)) {
         return {
           success: true,
-          shipments: mergeRecords(data.shipments, readBrowserRecords<ShipmentRecord>(browserShipmentsKey)),
+          shipments: mergeRecords(
+            data.shipments,
+            readBrowserRecords<ShipmentRecord>(browserShipmentsKey),
+            readBrowserRecords<{ id: string }>(deletedShipmentsKey),
+          ),
         };
       }
     }
@@ -410,7 +452,11 @@ export async function adminGetShipments(): Promise<{ success: boolean; shipments
   }
   return {
     success: true,
-    shipments: mergeRecords(SAMPLE_SHIPMENTS, readBrowserRecords<ShipmentRecord>(browserShipmentsKey)),
+    shipments: mergeRecords(
+      SAMPLE_SHIPMENTS,
+      readBrowserRecords<ShipmentRecord>(browserShipmentsKey),
+      readBrowserRecords<{ id: string }>(deletedShipmentsKey),
+    ),
   };
 }
 
@@ -423,7 +469,7 @@ export async function adminCreateShipment(shipmentData: Partial<ShipmentRecord>)
     });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.success && data.shipment) {
-      saveBrowserRecord(browserShipmentsKey, data.shipment);
+      saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
       return { ...data, storage: 'server' };
     }
     if (res.status === 404 || res.status >= 500 || !data) return createBrowserShipment(shipmentData);
@@ -459,14 +505,26 @@ export async function adminAddShipmentCheckpoint(id: string, checkpoint: any): P
   }
 }
 
-export async function adminDeleteShipment(id: string): Promise<{ success: boolean; error?: string }> {
+export async function adminDeleteShipment(id: string): Promise<{ success: boolean; error?: string; storage?: 'server' | 'browser' }> {
   try {
     const res = await fetch(`/api/admin/shipments/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
-    return await res.json();
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Network error' };
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success) {
+      deleteBrowserRecord<ShipmentRecord>(browserShipmentsKey, deletedShipmentsKey, id);
+      return { ...data, storage: 'server' };
+    }
+    if (!data || res.status === 404 || res.status >= 500) {
+      return deleteBrowserRecord<ShipmentRecord>(browserShipmentsKey, deletedShipmentsKey, id)
+        ? { success: true, storage: 'browser' }
+        : { success: false, error: 'The server API is unavailable and this device could not record the deletion.' };
+    }
+    return { success: false, error: data.error || 'Shipment could not be deleted.' };
+  } catch {
+    return deleteBrowserRecord<ShipmentRecord>(browserShipmentsKey, deletedShipmentsKey, id)
+      ? { success: true, storage: 'browser' }
+      : { success: false, error: 'The server API is unavailable and this device could not record the deletion.' };
   }
 }
 
