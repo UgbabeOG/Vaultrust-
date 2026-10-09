@@ -14,6 +14,7 @@ import {
   Package,
   Layers,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
   Eye,
   FileCheck2,
@@ -68,6 +69,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // In-app deletion confirmation state (replaces window.confirm which is blocked inside iframes)
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    type: 'vault' | 'shipment' | 'reservation';
+    id: string;
+    title: string;
+    description: string;
+    sublabel?: string;
+    confirmButtonText: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Modals for CRUD operations
   const [isCreateVaultOpen, setIsCreateVaultOpen] = useState(false);
   const [editingVault, setEditingVault] = useState<VaultRecord | null>(null);
@@ -121,29 +133,29 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   };
 
   // --- VAULT CRUD HANDLERS ---
-  const handleDeleteVault = async (id: string) => {
-    if (!window.confirm(`Are you sure you want to de-allocate and remove vault ${id}?`)) return;
-    const res = await adminDeleteVault(id);
-    if (res.success) {
-      setVaults((prev) => prev.filter((v) => v.id !== id));
-      showFeedback(`Vault ${id} successfully de-allocated.`);
-      if (onVaultOrShipmentUpdated) onVaultOrShipmentUpdated(id);
-    } else {
-      showFeedback(res.error || 'Failed to delete vault', 'error');
-    }
+  const handleDeleteVault = (id: string, sublabel?: string) => {
+    const v = vaults.find((vault) => vault.id === id);
+    setDeleteConfirmation({
+      type: 'vault',
+      id,
+      title: 'Confirm Depository De-allocation',
+      description: `Are you sure you want to de-allocate and unseal vault ${id}? This will remove the compartment and its asset allocation from the active depository registry.`,
+      sublabel: sublabel || (v ? `${v.facility} · ${v.tier} · ${v.totalEstimatedValue}` : undefined),
+      confirmButtonText: 'De-allocate Vault',
+    });
   };
 
   // --- SHIPMENT CRUD HANDLERS ---
-  const handleDeleteShipment = async (id: string) => {
-    if (!window.confirm(`Delete shipment ${id} from transit tracking?`)) return;
-    const res = await adminDeleteShipment(id);
-    if (res.success) {
-      setShipments((prev) => prev.filter((s) => s.id !== id && s.trackingNumber !== id));
-      showFeedback(`Shipment ${id} archived.`);
-      if (onVaultOrShipmentUpdated) onVaultOrShipmentUpdated(id);
-    } else {
-      showFeedback(res.error || 'Failed to delete shipment', 'error');
-    }
+  const handleDeleteShipment = (id: string, sublabel?: string) => {
+    const s = shipments.find((ship) => ship.id === id || ship.trackingNumber === id);
+    setDeleteConfirmation({
+      type: 'shipment',
+      id,
+      title: 'Confirm Transit Record Deletion',
+      description: `Are you sure you want to delete shipment ${id} from transit tracking? Active telemetry and waypoint logs will be permanently removed.`,
+      sublabel: sublabel || (s ? `${s.trackingNumber} · ${s.courierLevel} · ${s.destination}` : undefined),
+      confirmButtonText: 'Delete Shipment',
+    });
   };
 
   const handleUpdateShipmentStatus = async (id: string, newStatus: string) => {
@@ -164,35 +176,82 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
-  const handleDeleteReservation = async (id: string) => {
-    if (!window.confirm(`Archive reservation ${id}?`)) return;
-    const res = await adminDeleteReservation(id);
-    if (res.success) {
-      setReservations((prev) => prev.filter((r) => r.id !== id));
-      showFeedback(`Reservation ${id} removed.`);
+  const handleDeleteReservation = (id: string, sublabel?: string) => {
+    const r = reservations.find((res) => res.id === id);
+    setDeleteConfirmation({
+      type: 'reservation',
+      id,
+      title: 'Archive Client Dossier',
+      description: `Are you sure you want to archive reservation ${id}?`,
+      sublabel: sublabel || (r ? `${r.clientName} · ${r.facility} · ${r.status}` : undefined),
+      confirmButtonText: 'Archive Reservation',
+    });
+  };
+
+  // Execute confirmed deletion via API
+  const executeConfirmedDelete = async () => {
+    if (!deleteConfirmation) return;
+    setIsDeleting(true);
+    const { type, id } = deleteConfirmation;
+
+    try {
+      if (type === 'vault') {
+        const res = await adminDeleteVault(id);
+        if (res.success) {
+          setVaults((prev) => prev.filter((v) => v.id !== id));
+          if (editingVault?.id === id) setEditingVault(null);
+          if (managingItemsVault?.id === id) setManagingItemsVault(null);
+          showFeedback(`Vault ${id} successfully de-allocated.`);
+        } else {
+          showFeedback(res.error || 'Failed to delete vault', 'error');
+        }
+      } else if (type === 'shipment') {
+        const res = await adminDeleteShipment(id);
+        if (res.success) {
+          setShipments((prev) => prev.filter((s) => s.id !== id && s.trackingNumber !== id));
+          if (editingShipment?.id === id) setEditingShipment(null);
+          if (checkpointShipment?.id === id) setCheckpointShipment(null);
+          showFeedback(`Shipment ${id} archived.`);
+        } else {
+          showFeedback(res.error || 'Failed to delete shipment', 'error');
+        }
+      } else if (type === 'reservation') {
+        const res = await adminDeleteReservation(id);
+        if (res.success) {
+          setReservations((prev) => prev.filter((r) => r.id !== id));
+          showFeedback(`Reservation ${id} removed.`);
+        } else {
+          showFeedback(res.error || 'Failed to delete reservation', 'error');
+        }
+      }
+    } catch (err: any) {
+      showFeedback(err?.message || 'Error executing deletion', 'error');
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmation(null);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-6xl max-h-[92vh] bg-[#0c0e14] border border-[#2b3140] rounded-sm shadow-2xl flex flex-col text-[#f5f5f7] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex justify-center p-2 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div className={`relative w-full max-w-6xl ${isAuthenticated ? 'h-[90vh]' : 'max-h-[92vh]'} max-h-[92vh] my-auto bg-[#0c0e14] border border-[#2b3140] rounded-sm shadow-2xl flex flex-col text-[#f5f5f7] overflow-hidden`}>
         {/* Top Header */}
-        <div className="px-6 py-4 bg-[#12151e] border-b border-[#232733] flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 bg-[#12151e] border-b border-[#232733] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-sm bg-[#1a1f2c] border border-[#c5a059]/50 flex items-center justify-center text-[#c5a059]">
+            <div className="w-8 h-8 rounded-sm bg-[#1a1f2c] border border-[#c5a059]/50 flex items-center justify-center text-[#c5a059] shrink-0">
               <Shield className="w-4 h-4" />
             </div>
             <div>
-              <span className="font-display text-sm tracking-wider uppercase font-semibold text-[#f5f5f7] block">
+              <span className="font-display text-xs sm:text-sm tracking-wider uppercase font-semibold text-[#f5f5f7] block">
                 Valtrust Sentinel — Registrar Command Portal
               </span>
-              <span className="text-[11px] text-[#8e95a5]">
+              <span className="text-[10px] sm:text-[11px] text-[#8e95a5]">
                 Depository Management & Sovereign CRUD Console
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {isAuthenticated && (
               <>
                 <button
@@ -227,7 +286,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         {/* Feedback Alert Toast */}
         {feedbackMsg && (
           <div
-            className={`px-6 py-2.5 text-xs flex items-center justify-between ${
+            className={`px-4 sm:px-6 py-2.5 text-xs flex items-center justify-between shrink-0 ${
               feedbackMsg.type === 'success'
                 ? 'bg-emerald-950/80 border-b border-emerald-500/50 text-emerald-300'
                 : 'bg-red-950/80 border-b border-red-500/50 text-red-300'
@@ -242,7 +301,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
         {/* AUTHENTICATION GATE */}
         {!isAuthenticated ? (
-          <div className="p-8 sm:p-14 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+          <div className="p-6 sm:p-14 flex flex-col items-center justify-center text-center max-w-md mx-auto overflow-y-auto my-auto max-h-[calc(92vh-80px)]">
             <div className="w-14 h-14 rounded-full bg-[#161a24] border border-[#c5a059]/40 flex items-center justify-center text-[#c5a059] mb-4">
               <KeyRound className="w-7 h-7" />
             </div>
@@ -281,13 +340,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
         ) : (
           /* AUTHENTICATED WORKSPACE */
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {/* Tab Navigation */}
-            <div className="px-6 bg-[#0f1118] border-b border-[#232733] flex items-center justify-between">
-              <div className="flex items-center gap-1 sm:gap-2">
+            <div className="px-4 sm:px-6 bg-[#0f1118] border-b border-[#232733] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 overflow-x-auto shrink-0">
+              <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('vaults')}
-                  className={`px-4 py-3 text-xs font-medium border-b-2 transition-all flex items-center gap-2 ${
+                  className={`px-3 sm:px-4 py-3 text-xs font-medium border-b-2 whitespace-nowrap transition-all flex items-center gap-2 ${
                     activeTab === 'vaults'
                       ? 'border-[#c5a059] text-[#faebd7] bg-[#161a24]/50'
                       : 'border-transparent text-[#828899] hover:text-[#f5f5f7]'
@@ -347,7 +406,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
             {/* TAB 1: VAULTS CRUD */}
             {activeTab === 'vaults' && (
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 pb-12 space-y-4">
                 <div className="flex items-center justify-between text-xs text-[#828899] pb-2 border-b border-[#1c202a]">
                   <span>Active Depository Allocations (CREATE, READ, UPDATE, DELETE)</span>
                   <span>Changes immediately reflect in client search console</span>
@@ -393,8 +452,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           <span>Edit</span>
                         </button>
                         <button
-                          onClick={() => handleDeleteVault(vault.id)}
-                          className="px-2.5 py-1.5 text-xs font-medium text-red-400 bg-[#191114] border border-red-900/40 hover:border-red-500 rounded-sm transition-colors flex items-center gap-1.5"
+                          onClick={() => handleDeleteVault(vault.id, `${vault.facility} · ${vault.tier}`)}
+                          className="px-2.5 py-1.5 text-xs font-medium text-red-400 bg-[#191114] border border-red-900/40 hover:border-red-500 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                          title="De-allocate vault compartment"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>De-allocate</span>
@@ -408,7 +468,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
             {/* TAB 2: SHIPMENTS CRUD */}
             {activeTab === 'shipments' && (
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 pb-12 space-y-4">
                 <div className="flex items-center justify-between text-xs text-[#828899] pb-2 border-b border-[#1c202a]">
                   <span>Active Armored Transit Database (CREATE, READ, UPDATE, DELETE)</span>
                   <span>Direct satellite tracking telemetry management</span>
@@ -471,8 +531,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         </button>
 
                         <button
-                          onClick={() => handleDeleteShipment(shipment.id)}
-                          className="px-2.5 py-1.5 text-xs font-medium text-red-400 bg-[#191114] border border-red-900/40 hover:border-red-500 rounded-sm transition-colors flex items-center gap-1.5"
+                          onClick={() => handleDeleteShipment(shipment.id, `${shipment.trackingNumber} · ${shipment.manifestDescription}`)}
+                          className="px-2.5 py-1.5 text-xs font-medium text-red-400 bg-[#191114] border border-red-900/40 hover:border-red-500 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                          title="Delete transit tracking record"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Delete</span>
@@ -486,7 +547,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
             {/* TAB 3: RESERVATIONS CRUD */}
             {activeTab === 'reservations' && (
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 pb-12 space-y-4">
                 <div className="flex items-center justify-between text-xs text-[#828899] pb-2 border-b border-[#1c202a]">
                   <span>Client Reservation Dossiers Submitted via Portal & API</span>
                   <span>Review, approve, and allocate safe custody compartments</span>
@@ -546,8 +607,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             Mark Contacted
                           </button>
                           <button
-                            onClick={() => handleDeleteReservation(res.id)}
-                            className="p-1.5 text-red-400 hover:text-red-300 rounded-sm"
+                            onClick={() => handleDeleteReservation(res.id, `${res.clientName} · ${res.facility}`)}
+                            className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-sm transition-colors cursor-pointer"
                             title="Archive Dossier"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -648,6 +709,70 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         {isGuideOpen && (
           <CrudOperationsGuideModal onClose={() => setIsGuideOpen(false)} />
         )}
+
+        {/* MODAL: IN-APP DELETION CONFIRMATION DIALOG (Reliable in iframes) */}
+        {deleteConfirmation && (
+          <div
+            className="fixed inset-0 z-70 flex justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto"
+            onClick={() => !isDeleting && setDeleteConfirmation(null)}
+          >
+            <div
+              className="w-full max-w-md my-auto bg-[#10131b] border border-red-900/60 rounded-sm shadow-2xl p-5 sm:p-6 space-y-4 text-[#f5f5f7]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3.5">
+                <div className="p-2.5 bg-red-950/70 border border-red-800/80 rounded-full text-red-400 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-[#f5f5f7]">
+                    {deleteConfirmation.title}
+                  </h3>
+                  <div className="inline-block px-2 py-0.5 font-mono text-xs font-semibold bg-[#1a1315] border border-red-900/50 text-red-400 rounded-sm">
+                    {deleteConfirmation.id}
+                  </div>
+                  <p className="text-xs text-[#9aa0b0] leading-relaxed pt-1">
+                    {deleteConfirmation.description}
+                  </p>
+                  {deleteConfirmation.sublabel && (
+                    <div className="mt-2 text-[11px] font-mono text-[#8a92a6] bg-[#080a0f] border border-[#1e2330] p-2.5 rounded-sm break-words">
+                      {deleteConfirmation.sublabel}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[#1e2330] flex items-center justify-end gap-2.5 text-xs">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setDeleteConfirmation(null)}
+                  className="px-3.5 py-2 bg-[#141822] border border-[#2b3140] hover:bg-[#1b212f] hover:text-[#f5f5f7] text-[#c0c5d2] rounded-sm transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={executeConfirmedDelete}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium rounded-sm transition-colors flex items-center gap-1.5 shadow-lg shadow-red-950/40 cursor-pointer"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{deleteConfirmation.confirmButtonText}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -682,89 +807,91 @@ function CreateVaultModal({ onClose, onCreated }: { onClose: () => void; onCreat
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
-      <div className="w-full max-w-md bg-[#10131b] border border-[#2b3140] p-6 rounded-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-display text-lg text-[#f5f5f7]">Provision New Vault Allocation</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-[#727a8d]" /></button>
+    <div className="fixed inset-0 z-60 flex justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-md max-h-[92vh] flex flex-col bg-[#10131b] border border-[#2b3140] rounded-sm shadow-2xl my-auto overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#1e2330] flex justify-between items-center shrink-0">
+          <h3 className="font-display text-base sm:text-lg text-[#f5f5f7]">Provision New Vault Allocation</h3>
+          <button onClick={onClose} className="p-1 text-[#727a8d] hover:text-[#f5f5f7]"><X className="w-4 h-4" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block text-[#828899] mb-1">Vault Code ID</label>
-            <input
-              type="text"
-              value={vaultId}
-              onChange={(e) => setVaultId(e.target.value.toUpperCase())}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] font-mono text-[#c5a059] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Depository Facility</label>
-            <select
-              value={facility}
-              onChange={(e) => setFacility(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            >
-              <option value="Zurich Bedrock Depository — Sub-Level 4">Zurich Bedrock Depository — Sub-Level 4</option>
-              <option value="London Mayfair Safe Depository — Vault Suite B">London Mayfair Safe Depository — Vault Suite B</option>
-              <option value="Singapore Freeport Depository — Vault Delta">Singapore Freeport Depository — Vault Delta</option>
-              <option value="Geneva SafePort Depository — Vault Alpha">Geneva SafePort Depository — Vault Alpha</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0">
+          <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             <div>
-              <label className="block text-[#828899] mb-1">Tier</label>
-              <select
-                value={tier}
-                onChange={(e) => setTier(e.target.value)}
-                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-              >
-                <option value="Class I Safe Deposit Box">Class I Safe Deposit Box</option>
-                <option value="Class II Depository Drawer">Class II Depository Drawer</option>
-                <option value="Class III Fortress Chamber">Class III Fortress Chamber</option>
-              </select>
+              <label className="block text-[#828899] mb-1">Vault Code ID</label>
+              <input
+                type="text"
+                value={vaultId}
+                onChange={(e) => setVaultId(e.target.value.toUpperCase())}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] font-mono text-[#c5a059] rounded-sm"
+              />
             </div>
             <div>
-              <label className="block text-[#828899] mb-1">Status</label>
+              <label className="block text-[#828899] mb-1">Depository Facility</label>
               <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                value={facility}
+                onChange={(e) => setFacility(e.target.value)}
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               >
-                <option value="Allocated & Sealed">Allocated & Sealed</option>
-                <option value="Under Scheduled Audit">Under Scheduled Audit</option>
-                <option value="Accessible by Custodian">Accessible by Custodian</option>
+                <option value="Zurich Bedrock Depository — Sub-Level 4">Zurich Bedrock Depository — Sub-Level 4</option>
+                <option value="London Mayfair Safe Depository — Vault Suite B">London Mayfair Safe Depository — Vault Suite B</option>
+                <option value="Singapore Freeport Depository — Vault Delta">Singapore Freeport Depository — Vault Delta</option>
+                <option value="Geneva SafePort Depository — Vault Alpha">Geneva SafePort Depository — Vault Alpha</option>
               </select>
             </div>
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Estimated Specie Valuation</label>
-            <input
-              type="text"
-              value={totalVal}
-              onChange={(e) => setTotalVal(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Lloyd's Insured Limit</label>
-            <input
-              type="text"
-              value={coverageLimit}
-              onChange={(e) => setCoverageLimit(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#c5a059] hover:bg-[#faebd7] rounded-sm"
-            >
-              {isSubmitting ? 'Creating...' : 'Provision Vault in Depository'}
-            </button>
-          </div>
-        </form>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[#828899] mb-1">Tier</label>
+                <select
+                  value={tier}
+                  onChange={(e) => setTier(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+                >
+                  <option value="Class I Safe Deposit Box">Class I Safe Deposit Box</option>
+                  <option value="Class II Depository Drawer">Class II Depository Drawer</option>
+                  <option value="Class III Fortress Chamber">Class III Fortress Chamber</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[#828899] mb-1">Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+                >
+                  <option value="Allocated & Sealed">Allocated & Sealed</option>
+                  <option value="Under Scheduled Audit">Under Scheduled Audit</option>
+                  <option value="Accessible by Custodian">Accessible by Custodian</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Estimated Specie Valuation</label>
+              <input
+                type="text"
+                value={totalVal}
+                onChange={(e) => setTotalVal(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Lloyd's Insured Limit</label>
+              <input
+                type="text"
+                value={coverageLimit}
+                onChange={(e) => setCoverageLimit(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#c5a059] hover:bg-[#faebd7] rounded-sm"
+              >
+                {isSubmitting ? 'Creating...' : 'Provision Vault in Depository'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -795,53 +922,55 @@ function EditVaultModal({ vault, onClose, onUpdated }: { vault: VaultRecord; onC
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
-      <div className="w-full max-w-md bg-[#10131b] border border-[#2b3140] p-6 rounded-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-display text-lg text-[#f5f5f7]">Edit Vault: {vault.id}</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-[#727a8d]" /></button>
+    <div className="fixed inset-0 z-60 flex justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-md max-h-[92vh] flex flex-col bg-[#10131b] border border-[#2b3140] rounded-sm shadow-2xl my-auto overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#1e2330] flex justify-between items-center shrink-0">
+          <h3 className="font-display text-base sm:text-lg text-[#f5f5f7]">Edit Vault: {vault.id}</h3>
+          <button onClick={onClose} className="p-1 text-[#727a8d] hover:text-[#f5f5f7]"><X className="w-4 h-4" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block text-[#828899] mb-1">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            >
-              <option value="Allocated & Sealed">Allocated & Sealed</option>
-              <option value="Under Scheduled Audit">Under Scheduled Audit</option>
-              <option value="Accessible by Custodian">Accessible by Custodian</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Facility</label>
-            <input
-              type="text"
-              value={facility}
-              onChange={(e) => setFacility(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Valuation</label>
-            <input
-              type="text"
-              value={totalVal}
-              onChange={(e) => setTotalVal(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#c5a059] hover:bg-[#faebd7] rounded-sm"
-            >
-              {isSubmitting ? 'Saving...' : 'Update Vault Parameters'}
-            </button>
-          </div>
-        </form>
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0">
+          <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+            <div>
+              <label className="block text-[#828899] mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              >
+                <option value="Allocated & Sealed">Allocated & Sealed</option>
+                <option value="Under Scheduled Audit">Under Scheduled Audit</option>
+                <option value="Accessible by Custodian">Accessible by Custodian</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Facility</label>
+              <input
+                type="text"
+                value={facility}
+                onChange={(e) => setFacility(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Valuation</label>
+              <input
+                type="text"
+                value={totalVal}
+                onChange={(e) => setTotalVal(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#c5a059] hover:bg-[#faebd7] rounded-sm"
+              >
+                {isSubmitting ? 'Saving...' : 'Update Vault Parameters'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -883,99 +1012,104 @@ function ManageVaultItemsModal({ vault, onClose, onVaultUpdated }: { vault: Vaul
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
-      <div className="w-full max-w-2xl bg-[#10131b] border border-[#2b3140] p-6 rounded-sm space-y-4 max-h-[85vh] flex flex-col">
-        <div className="flex justify-between items-center">
+    <div className="fixed inset-0 z-60 flex justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-[#10131b] border border-[#2b3140] rounded-sm shadow-2xl my-auto overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#1e2330] flex justify-between items-center shrink-0">
           <div>
-            <h3 className="font-display text-lg text-[#f5f5f7]">Inventory Assets: {vault.id}</h3>
+            <h3 className="font-display text-base sm:text-lg text-[#f5f5f7]">Inventory Assets: {vault.id}</h3>
             <span className="text-xs text-[#828899]">{vault.items.length} items currently allocated</span>
           </div>
-          <button onClick={onClose}><X className="w-4 h-4 text-[#727a8d]" /></button>
+          <button onClick={onClose} className="p-1 text-[#727a8d] hover:text-[#f5f5f7]"><X className="w-4 h-4" /></button>
         </div>
 
-        {/* Existing items list */}
-        <div className="flex-1 overflow-y-auto divide-y divide-[#1e2330] border border-[#232733] rounded-sm bg-[#080a0f] p-3 space-y-2">
-          {vault.items.length === 0 ? (
-            <div className="text-center py-4 text-xs text-[#6e7587]">No allocated items in this compartment.</div>
-          ) : (
-            vault.items.map((it) => (
-              <div key={it.id} className="pt-2 pb-2 flex justify-between items-center text-xs">
-                <div>
-                  <div className="font-medium text-[#f5f5f7]">{it.name}</div>
-                  <div className="text-[11px] text-[#7aa2f7]">
-                    {it.category} {it.weightOrCarat && `· ${it.weightOrCarat}`} {it.certificationNumber && `· ${it.certificationNumber}`}
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0 space-y-4">
+          {/* Existing items list */}
+          <div>
+            <div className="text-xs font-medium text-[#828899] mb-2">Allocated Vault Holdings</div>
+            <div className="max-h-56 overflow-y-auto divide-y divide-[#1e2330] border border-[#232733] rounded-sm bg-[#080a0f] p-3 space-y-2">
+              {vault.items.length === 0 ? (
+                <div className="text-center py-4 text-xs text-[#6e7587]">No allocated items in this compartment.</div>
+              ) : (
+                vault.items.map((it) => (
+                  <div key={it.id} className="pt-2 pb-2 flex justify-between items-center text-xs">
+                    <div>
+                      <div className="font-medium text-[#f5f5f7]">{it.name}</div>
+                      <div className="text-[11px] text-[#7aa2f7]">
+                        {it.category} {it.weightOrCarat && `· ${it.weightOrCarat}`} {it.certificationNumber && `· ${it.certificationNumber}`}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-[#c5a059]">{it.estimatedValue}</span>
+                      <button
+                        onClick={() => handleDeleteItem(it.id)}
+                        className="text-red-400 hover:text-red-300 p-1"
+                        title="Remove item"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-[#c5a059]">{it.estimatedValue}</span>
-                  <button
-                    onClick={() => handleDeleteItem(it.id)}
-                    className="text-red-400 hover:text-red-300 p-1"
-                    title="Remove item"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+                ))
+              )}
+            </div>
+          </div>
 
-        {/* Add new item form */}
-        <form onSubmit={handleAddItem} className="pt-2 border-t border-[#1e2330] space-y-3 text-xs">
-          <div className="font-medium text-[#c5a059]">Add Allocated Asset to Vault</div>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              required
-              placeholder="Asset description / item name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+          {/* Add new item form */}
+          <form onSubmit={handleAddItem} className="pt-3 border-t border-[#1e2330] space-y-3 text-xs">
+            <div className="font-medium text-[#c5a059]">Add Allocated Asset to Vault</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                required
+                placeholder="Asset description / item name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              >
+                <option value="Gold Bullion">Gold Bullion</option>
+                <option value="Diamonds">Diamonds</option>
+                <option value="Platinum">Platinum</option>
+                <option value="Fine Horology">Fine Horology</option>
+                <option value="Precious Artifacts">Precious Artifacts</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                type="text"
+                placeholder="Valuation (e.g. $250,000 USD)"
+                value={estimatedValue}
+                onChange={(e) => setEstimatedValue(e.target.value)}
+                className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+              <input
+                type="text"
+                placeholder="Weight / Carats"
+                value={weightOrCarat}
+                onChange={(e) => setWeightOrCarat(e.target.value)}
+                className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+              <input
+                type="text"
+                placeholder="Assay / GIA Cert #"
+                value={cert}
+                onChange={(e) => setCert(e.target.value)}
+                className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#c5a059] hover:bg-[#faebd7] rounded-sm"
             >
-              <option value="Gold Bullion">Gold Bullion</option>
-              <option value="Diamonds">Diamonds</option>
-              <option value="Platinum">Platinum</option>
-              <option value="Fine Horology">Fine Horology</option>
-              <option value="Precious Artifacts">Precious Artifacts</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <input
-              type="text"
-              placeholder="Valuation (e.g. $250,000 USD)"
-              value={estimatedValue}
-              onChange={(e) => setEstimatedValue(e.target.value)}
-              className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-            <input
-              type="text"
-              placeholder="Weight / Carats"
-              value={weightOrCarat}
-              onChange={(e) => setWeightOrCarat(e.target.value)}
-              className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-            <input
-              type="text"
-              placeholder="Assay / GIA Cert #"
-              value={cert}
-              onChange={(e) => setCert(e.target.value)}
-              className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#c5a059] hover:bg-[#faebd7] rounded-sm"
-          >
-            {isSubmitting ? 'Adding...' : 'Allocate Asset to Vault'}
-          </button>
-        </form>
+              {isSubmitting ? 'Adding...' : 'Allocate Asset to Vault'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -1008,75 +1142,77 @@ function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCr
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
-      <div className="w-full max-w-md bg-[#10131b] border border-[#2b3140] p-6 rounded-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-display text-lg text-[#f5f5f7]">Dispatch Armored Shipment</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-[#727a8d]" /></button>
+    <div className="fixed inset-0 z-60 flex justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-md max-h-[92vh] flex flex-col bg-[#10131b] border border-[#2b3140] rounded-sm shadow-2xl my-auto overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#1e2330] flex justify-between items-center shrink-0">
+          <h3 className="font-display text-base sm:text-lg text-[#f5f5f7]">Dispatch Armored Shipment</h3>
+          <button onClick={onClose} className="p-1 text-[#727a8d] hover:text-[#f5f5f7]"><X className="w-4 h-4" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block text-[#828899] mb-1">Waybill Tracking Number</label>
-            <input
-              type="text"
-              value={trackingNumber}
-              onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] font-mono text-[#7aa2f7] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Manifest Description</label>
-            <input
-              type="text"
-              required
-              value={manifest}
-              onChange={(e) => setManifest(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Destination Address / Apron</label>
-            <input
-              type="text"
-              required
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0">
+          <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             <div>
-              <label className="block text-[#828899] mb-1">Escort Protocol</label>
-              <select
-                value={courierLevel}
-                onChange={(e) => setCourierLevel(e.target.value)}
-                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-              >
-                <option value="Level 5 Armed Convoy">Level 5 Armed Convoy</option>
-                <option value="Guarded Diplomatic Air Courier">Guarded Air Courier</option>
-                <option value="Armored Maritime Escort">Armored Maritime</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[#828899] mb-1">Lead Custodian</label>
+              <label className="block text-[#828899] mb-1">Waybill Tracking Number</label>
               <input
                 type="text"
-                value={leadCourier}
-                onChange={(e) => setLeadCourier(e.target.value)}
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] font-mono text-[#7aa2f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Manifest Description</label>
+              <input
+                type="text"
+                required
+                value={manifest}
+                onChange={(e) => setManifest(e.target.value)}
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
-          </div>
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#7aa2f7] hover:bg-[#a0c0ff] rounded-sm"
-            >
-              {isSubmitting ? 'Registering...' : 'Dispatch Shipment to Database'}
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className="block text-[#828899] mb-1">Destination Address / Apron</label>
+              <input
+                type="text"
+                required
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[#828899] mb-1">Escort Protocol</label>
+                <select
+                  value={courierLevel}
+                  onChange={(e) => setCourierLevel(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+                >
+                  <option value="Level 5 Armed Convoy">Level 5 Armed Convoy</option>
+                  <option value="Guarded Diplomatic Air Courier">Guarded Air Courier</option>
+                  <option value="Armored Maritime Escort">Armored Maritime</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[#828899] mb-1">Lead Custodian</label>
+                <input
+                  type="text"
+                  value={leadCourier}
+                  onChange={(e) => setLeadCourier(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+                />
+              </div>
+            </div>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#7aa2f7] hover:bg-[#a0c0ff] rounded-sm"
+              >
+                {isSubmitting ? 'Registering...' : 'Dispatch Shipment to Database'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -1105,54 +1241,56 @@ function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: Shipmen
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
-      <div className="w-full max-w-md bg-[#10131b] border border-[#2b3140] p-6 rounded-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-display text-lg text-[#f5f5f7]">Edit Transit: {shipment.trackingNumber}</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-[#727a8d]" /></button>
+    <div className="fixed inset-0 z-60 flex justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-md max-h-[92vh] flex flex-col bg-[#10131b] border border-[#2b3140] rounded-sm shadow-2xl my-auto overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#1e2330] flex justify-between items-center shrink-0">
+          <h3 className="font-display text-base sm:text-lg text-[#f5f5f7]">Edit Transit: {shipment.trackingNumber}</h3>
+          <button onClick={onClose} className="p-1 text-[#727a8d] hover:text-[#f5f5f7]"><X className="w-4 h-4" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block text-[#828899] mb-1">Transit Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            >
-              <option value="In Transit">In Transit</option>
-              <option value="Cleared Customs / Apron Transfer">Cleared Customs / Apron Transfer</option>
-              <option value="Dispatched Final Mile">Dispatched Final Mile</option>
-              <option value="Delivered & Handed Over">Delivered & Handed Over</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Current Waypoint / Status Note</label>
-            <input
-              type="text"
-              value={checkpoint}
-              onChange={(e) => setCheckpoint(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Estimated Handover Time</label>
-            <input
-              type="text"
-              value={eta}
-              onChange={(e) => setEta(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#7aa2f7] hover:bg-[#a0c0ff] rounded-sm"
-            >
-              {isSubmitting ? 'Updating...' : 'Save Transit Telemetry'}
-            </button>
-          </div>
-        </form>
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0">
+          <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+            <div>
+              <label className="block text-[#828899] mb-1">Transit Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              >
+                <option value="In Transit">In Transit</option>
+                <option value="Cleared Customs / Apron Transfer">Cleared Customs / Apron Transfer</option>
+                <option value="Dispatched Final Mile">Dispatched Final Mile</option>
+                <option value="Delivered & Handed Over">Delivered & Handed Over</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Current Waypoint / Status Note</label>
+              <input
+                type="text"
+                value={checkpoint}
+                onChange={(e) => setCheckpoint(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Estimated Handover Time</label>
+              <input
+                type="text"
+                value={eta}
+                onChange={(e) => setEta(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#7aa2f7] hover:bg-[#a0c0ff] rounded-sm"
+              >
+                {isSubmitting ? 'Updating...' : 'Save Transit Telemetry'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -1181,54 +1319,56 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
-      <div className="w-full max-w-md bg-[#10131b] border border-[#2b3140] p-6 rounded-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-display text-lg text-[#f5f5f7]">Log Waypoint: {shipment.trackingNumber}</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-[#727a8d]" /></button>
+    <div className="fixed inset-0 z-60 flex justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-md max-h-[92vh] flex flex-col bg-[#10131b] border border-[#2b3140] rounded-sm shadow-2xl my-auto overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#1e2330] flex justify-between items-center shrink-0">
+          <h3 className="font-display text-base sm:text-lg text-[#f5f5f7]">Log Waypoint: {shipment.trackingNumber}</h3>
+          <button onClick={onClose} className="p-1 text-[#727a8d] hover:text-[#f5f5f7]"><X className="w-4 h-4" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block text-[#828899] mb-1">Waypoint Location *</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Alpine Pass Checkpoint 05"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Checkpoint Status *</label>
-            <input
-              type="text"
-              required
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[#828899] mb-1">Security Notes</label>
-            <input
-              type="text"
-              placeholder="Optional escort notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-            />
-          </div>
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#7aa2f7] hover:bg-[#a0c0ff] rounded-sm"
-            >
-              {isSubmitting ? 'Logging...' : 'Log Waypoint to Live Tracker'}
-            </button>
-          </div>
-        </form>
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0">
+          <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+            <div>
+              <label className="block text-[#828899] mb-1">Waypoint Location *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Alpine Pass Checkpoint 05"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Checkpoint Status *</label>
+              <input
+                type="text"
+                required
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Security Notes</label>
+              <input
+                type="text"
+                placeholder="Optional escort notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 text-xs font-semibold uppercase tracking-wider text-[#08090b] bg-[#7aa2f7] hover:bg-[#a0c0ff] rounded-sm"
+              >
+                {isSubmitting ? 'Logging...' : 'Log Waypoint to Live Tracker'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -1236,8 +1376,8 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
 
 function CrudOperationsGuideModal({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-3xl max-h-[88vh] bg-[#0d1017] border border-[#2b3140] rounded-sm shadow-2xl flex flex-col text-[#f5f5f7] overflow-hidden">
+    <div className="fixed inset-0 z-60 flex justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div className="relative w-full max-w-3xl max-h-[88vh] my-auto bg-[#0d1017] border border-[#2b3140] rounded-sm shadow-2xl flex flex-col text-[#f5f5f7] overflow-hidden">
         {/* Modal Header */}
         <div className="px-6 py-4 bg-[#121622] border-b border-[#232733] flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1262,7 +1402,7 @@ function CrudOperationsGuideModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs leading-relaxed text-[#c1c6d4]">
+        <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6 text-xs leading-relaxed text-[#c1c6d4]">
           {/* Section 1: Overview */}
           <div className="p-4 bg-[#12151f] border border-[#232733] rounded-sm space-y-2">
             <div className="flex items-center gap-2 text-[#c5a059] font-medium text-sm">
