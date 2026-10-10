@@ -171,6 +171,7 @@ export interface DispatchResponse {
   success: boolean;
   trackingNumber: string;
   message: string;
+  shipment?: ShipmentRecord;
   error?: string;
 }
 
@@ -196,6 +197,15 @@ export async function searchVaultOrShipment(query: string): Promise<SearchResult
   const clean = query.trim();
   if (!clean) {
     return { success: false, type: 'not_found' };
+  }
+
+  const localShipment = readBrowserRecords<ShipmentRecord>(browserShipmentsKey).find(
+    (shipment) =>
+      shipment.id.toUpperCase() === clean.toUpperCase() ||
+      shipment.trackingNumber.toUpperCase() === clean.toUpperCase(),
+  );
+  if (localShipment) {
+    return { success: true, type: 'shipment', shipment: localShipment };
   }
 
   try {
@@ -264,6 +274,9 @@ export async function submitDispatch(
 
     if (res.ok) {
       const data = await res.json();
+      if (data.success && data.shipment) {
+        saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
+      }
       return data;
     } else {
       const err = await res.json();
@@ -276,9 +289,27 @@ export async function submitDispatch(
   } catch (err) {
     console.warn('Backend dispatch API unavailable, generating local tracking', err);
     const trk = `TRK-ARM-${Math.floor(1000 + Math.random() * 9000)}`;
+    const localShipment = createBrowserShipment({
+      trackingNumber: trk,
+      manifestDescription: `Dispatched Specie from Vault ${payload.vaultId}`,
+      originFacility: 'Valtrust Depository Sally Port',
+      destination: payload.destination,
+      courierLevel: payload.escortLevel,
+      transitStatus: 'Dispatched Final Mile',
+      vaultOriginId: payload.vaultId,
+    });
+    if (!localShipment.success || !localShipment.shipment) {
+      return {
+        success: false,
+        trackingNumber: '',
+        message: localShipment.error || 'Dispatch could not be saved for tracking.',
+      };
+    }
+
     return {
       success: true,
       trackingNumber: trk,
+      shipment: localShipment.shipment,
       message: `Armored safe-hand dispatch confirmed. Active waybill: ${trk}`,
     };
   }
