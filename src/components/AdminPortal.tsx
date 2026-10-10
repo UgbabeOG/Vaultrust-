@@ -1243,23 +1243,48 @@ function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCr
 
 function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: ShipmentRecord; onClose: () => void; onUpdated: (s: ShipmentRecord) => void }) {
   const [status, setStatus] = useState(shipment.transitStatus);
-  const [checkpoint, setCheckpoint] = useState(shipment.currentCheckpoint);
+  const checkpointIndex = (() => {
+    const activeIndex = shipment.checkpoints.findIndex((item) => !item.completed);
+    return activeIndex === -1 ? shipment.checkpoints.length - 1 : activeIndex;
+  })();
+  const currentCheckpoint = shipment.checkpoints[checkpointIndex];
+  const [checkpointLocation, setCheckpointLocation] = useState(currentCheckpoint?.location || '');
+  const [checkpointStatus, setCheckpointStatus] = useState(currentCheckpoint?.status || '');
+  const [checkpointNotes, setCheckpointNotes] = useState(currentCheckpoint?.notes || '');
   const [eta, setEta] = useState(shipment.estimatedDelivery);
   const [callsign, setCallsign] = useState(shipment.securityTeamCallsign);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError('');
+    const checkpoints = [...shipment.checkpoints];
+    const updatedCheckpoint = {
+      time: currentCheckpoint?.time || 'Immediate',
+      location: checkpointLocation.trim(),
+      status: checkpointStatus.trim(),
+      completed: currentCheckpoint?.completed ?? false,
+      notes: checkpointNotes.trim() || undefined,
+    };
+    if (checkpointIndex === -1) {
+      checkpoints.push(updatedCheckpoint);
+    } else {
+      checkpoints[checkpointIndex] = updatedCheckpoint;
+    }
     const res = await adminUpdateShipment(shipment.id, {
       transitStatus: status,
-      currentCheckpoint: checkpoint,
+      currentCheckpoint: `${updatedCheckpoint.location} · ${updatedCheckpoint.status}`,
+      checkpoints,
       estimatedDelivery: eta,
       securityTeamCallsign: callsign,
     });
     setIsSubmitting(false);
     if (res.success && res.shipment) {
       onUpdated(res.shipment);
+    } else {
+      setSubmitError(res.error || 'Shipment could not be updated.');
     }
   };
 
@@ -1286,11 +1311,31 @@ function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: Shipmen
               </select>
             </div>
             <div>
-              <label className="block text-[#828899] mb-1">Current Waypoint / Status Note</label>
+              <label className="block text-[#828899] mb-1">Current Checkpoint Location</label>
               <input
                 type="text"
-                value={checkpoint}
-                onChange={(e) => setCheckpoint(e.target.value)}
+                required
+                value={checkpointLocation}
+                onChange={(e) => setCheckpointLocation(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Checkpoint Status</label>
+              <input
+                type="text"
+                required
+                value={checkpointStatus}
+                onChange={(e) => setCheckpointStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Security Notes</label>
+              <input
+                type="text"
+                value={checkpointNotes}
+                onChange={(e) => setCheckpointNotes(e.target.value)}
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
@@ -1303,6 +1348,7 @@ function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: Shipmen
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
+            {submitError && <div role="alert" className="text-red-400">{submitError}</div>}
             <div className="pt-2">
               <button
                 type="submit"

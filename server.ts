@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { insertCheckpointBeforeFinalDestination } from './src/utils/shipmentCheckpoints';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -969,6 +970,7 @@ app.put('/api/admin/shipments/:id', (req: Request, res: Response) => {
   const {
     transitStatus,
     currentCheckpoint,
+    checkpoints,
     estimatedDelivery,
     securityTeamCallsign,
     leadCourier,
@@ -978,6 +980,7 @@ app.put('/api/admin/shipments/:id', (req: Request, res: Response) => {
     ...current,
     transitStatus: transitStatus !== undefined ? transitStatus : current.transitStatus,
     currentCheckpoint: currentCheckpoint !== undefined ? currentCheckpoint : current.currentCheckpoint,
+    checkpoints: Array.isArray(checkpoints) ? checkpoints : current.checkpoints,
     estimatedDelivery: estimatedDelivery !== undefined ? estimatedDelivery : current.estimatedDelivery,
     securityTeamCallsign: securityTeamCallsign !== undefined ? securityTeamCallsign : current.securityTeamCallsign,
     leadCourier: leadCourier !== undefined ? leadCourier : current.leadCourier,
@@ -1009,8 +1012,12 @@ app.post('/api/admin/shipments/:id/checkpoints', (req: Request, res: Response) =
     completed: completed !== undefined ? Boolean(completed) : true,
   };
 
-  shipment.checkpoints.push(newCheckpoint);
-  shipment.currentCheckpoint = `${location} · ${status}`;
+  shipment.checkpoints = insertCheckpointBeforeFinalDestination(
+    shipment.checkpoints,
+    newCheckpoint,
+    shipment.destination,
+  );
+  shipment.currentCheckpoint = `${newCheckpoint.location} · ${newCheckpoint.status}`;
 
   res.status(201).json({
     success: true,

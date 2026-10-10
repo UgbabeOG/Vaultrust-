@@ -1,10 +1,12 @@
 import {
   VaultRecord,
+  ShipmentCheckpoint,
   ShipmentRecord,
   SAMPLE_VAULTS,
   SAMPLE_SHIPMENTS,
   lookupCustodyRecord,
 } from '../data/mockCustodyData';
+import { insertCheckpointBeforeFinalDestination } from '../utils/shipmentCheckpoints';
 
 const browserVaultsKey = 'vaultrust-admin-vaults';
 const browserShipmentsKey = 'vaultrust-admin-shipments';
@@ -562,23 +564,43 @@ export async function adminCreateShipment(shipmentData: Partial<ShipmentRecord>)
 }
 
 export async function adminUpdateShipment(id: string, updates: Partial<ShipmentRecord>): Promise<{ success: boolean; shipment?: ShipmentRecord; error?: string }> {
+  const applyLocally = () => {
+    const allShipments = mergeRecords(
+      SAMPLE_SHIPMENTS,
+      readBrowserRecords<ShipmentRecord>(browserShipmentsKey),
+      readBrowserRecords<{ id: string }>(deletedShipmentsKey),
+    );
+    const shipment = allShipments.find((record) =>
+      record.id.toUpperCase() === id.toUpperCase() ||
+      record.trackingNumber.toUpperCase() === id.toUpperCase(),
+    );
+    if (!shipment) return { success: false, error: `Shipment ${id} not found.` };
+
+    const updatedShipment = { ...shipment, ...updates };
+    return saveBrowserRecord(browserShipmentsKey, updatedShipment, deletedShipmentsKey)
+      ? { success: true, shipment: updatedShipment }
+      : { success: false, error: 'Browser storage is unavailable. The shipment could not be updated.' };
+  };
+
   try {
     const res = await fetch(`/api/admin/shipments/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
     if (res.ok && data?.success && data.shipment) {
       saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
+      return data;
     }
+    if (!data || res.status === 404 || res.status >= 500) return applyLocally();
     return data;
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Network error' };
+  } catch {
+    return applyLocally();
   }
 }
 
-export async function adminAddShipmentCheckpoint(id: string, checkpoint: any): Promise<{ success: boolean; checkpoint?: any; shipment?: ShipmentRecord; error?: string }> {
+export async function adminAddShipmentCheckpoint(id: string, checkpoint: Partial<ShipmentCheckpoint>): Promise<{ success: boolean; checkpoint?: ShipmentCheckpoint; shipment?: ShipmentRecord; error?: string }> {
   const applyLocally = () => {
     const allShipments = mergeRecords(
       SAMPLE_SHIPMENTS,
@@ -588,7 +610,7 @@ export async function adminAddShipmentCheckpoint(id: string, checkpoint: any): P
     const shipment = allShipments.find((record) => record.id.toUpperCase() === id.toUpperCase());
     if (!shipment) return { success: false, error: `Shipment ${id} not found.` };
 
-    const newCheckpoint = {
+    const newCheckpoint: ShipmentCheckpoint = {
       time: `${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} CET`,
       location: checkpoint.location || 'Transit Waypoint',
       status: checkpoint.status || 'Checkpoint verified by escort detail',
@@ -597,7 +619,11 @@ export async function adminAddShipmentCheckpoint(id: string, checkpoint: any): P
     };
     const updatedShipment = {
       ...shipment,
-      checkpoints: [...shipment.checkpoints, newCheckpoint],
+      checkpoints: insertCheckpointBeforeFinalDestination(
+        shipment.checkpoints,
+        newCheckpoint,
+        shipment.destination,
+      ),
       currentCheckpoint: `${newCheckpoint.location} · ${newCheckpoint.status}`,
     };
     return saveBrowserRecord(browserShipmentsKey, updatedShipment, deletedShipmentsKey)

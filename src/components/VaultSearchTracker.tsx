@@ -21,6 +21,7 @@ import {
   ShipmentRecord,
 } from '../data/mockCustodyData';
 import { searchVaultOrShipment } from '../services/api';
+import { keepFinalDestinationLast } from '../utils/shipmentCheckpoints';
 import courierDispatchImage from '../assets/images/biometric_courier_dispatch_1791495350897.jpg';
 
 interface VaultSearchTrackerProps {
@@ -386,14 +387,17 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
                   </h4>
 
                   <div className="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-[11px] sm:before:left-[15px] before:top-2 before:bottom-2 before:w-[2px] before:bg-[#202533]">
-                    {activeRecord.shipment.checkpoints.map((checkpoint, idx) => (
+                    {keepFinalDestinationLast(
+                      activeRecord.shipment.checkpoints,
+                      activeRecord.shipment.destination,
+                    ).map((checkpoint, idx) => (
                       <div key={idx} className="relative">
                         {/* Stepper Dot */}
                         <div
                           className={`absolute -left-[23px] sm:-left-[27px] top-1 w-6 h-6 rounded-full flex items-center justify-center ${
                             checkpoint.completed
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
-                              : idx === activeRecord.shipment!.checkpoints.findIndex((c) => !c.completed)
+                              : checkpoint === activeRecord.shipment!.checkpoints.find((c) => !c.completed)
                               ? 'bg-[#c5a059]/20 text-[#c5a059] border border-[#c5a059] animate-pulse'
                               : 'bg-[#151922] text-[#4d5467] border border-[#262c3a]'
                           }`}
