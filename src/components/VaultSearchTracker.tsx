@@ -301,6 +301,15 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
                   <span aria-hidden="true">·</span>
                   <span>Est. Handover: {activeRecord.shipment.estimatedDelivery}</span>
                 </div>
+                <div className="flex items-start gap-2 pt-1 text-xs">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[#727a8d] block text-[11px]">Delivery Destination</span>
+                    <span className="text-sm font-medium text-[#f5f5f7]">
+                      {activeRecord.shipment.destination}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -320,22 +329,13 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
             </div>
 
             {/* Route Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#1f2430] border-b border-[#232733] bg-[#0c0e14] text-xs">
+            <div className="grid grid-cols-1 border-b border-[#232733] bg-[#0c0e14] text-xs">
               <div className="p-4 sm:p-5 flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-[#c5a059] shrink-0 mt-0.5" />
                 <div>
                   <span className="text-[#727a8d] block text-[11px]">Origin Depository Facility</span>
                   <span className="text-sm font-medium text-[#f5f5f7]">
                     {activeRecord.shipment.originFacility}
-                  </span>
-                </div>
-              </div>
-              <div className="p-4 sm:p-5 flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[#727a8d] block text-[11px]">Client Handover Destination</span>
-                  <span className="text-sm font-medium text-[#f5f5f7]">
-                    {activeRecord.shipment.destination}
                   </span>
                 </div>
               </div>
