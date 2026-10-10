@@ -204,18 +204,27 @@ export async function searchVaultOrShipment(query: string): Promise<SearchResult
       shipment.id.toUpperCase() === clean.toUpperCase() ||
       shipment.trackingNumber.toUpperCase() === clean.toUpperCase(),
   );
-  if (localShipment) {
-    return { success: true, type: 'shipment', shipment: localShipment };
-  }
 
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(clean)}`);
     if (res.ok) {
       const data = await res.json();
+      if (data.type === 'shipment' && data.shipment) {
+        if (data.dynamicallyAllocated && localShipment) {
+          return { success: true, type: 'shipment', shipment: localShipment };
+        }
+        if (!data.dynamicallyAllocated) {
+          saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
+        }
+      }
       return data;
     }
   } catch (err) {
     console.warn('Backend search API unavailable, falling back to local registry', err);
+  }
+
+  if (localShipment) {
+    return { success: true, type: 'shipment', shipment: localShipment };
   }
 
   // Resilient fallback to local registry
