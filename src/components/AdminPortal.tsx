@@ -996,11 +996,13 @@ function ManageVaultItemsModal({ vault, onClose, onVaultUpdated }: { vault: Vaul
   const [weightOrCarat, setWeightOrCarat] = useState('');
   const [cert, setCert] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setIsSubmitting(true);
+    setSubmitError('');
     const res = await adminAddItemToVault(vault.id, {
       name,
       category,
@@ -1014,6 +1016,8 @@ function ManageVaultItemsModal({ vault, onClose, onVaultUpdated }: { vault: Vaul
       setName('');
       setWeightOrCarat('');
       setCert('');
+    } else {
+      setSubmitError(res.error || 'Item could not be added to the vault.');
     }
   };
 
@@ -1114,6 +1118,7 @@ function ManageVaultItemsModal({ vault, onClose, onVaultUpdated }: { vault: Vaul
                 className="px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
+            {submitError && <div role="alert" className="text-red-400">{submitError}</div>}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -1319,11 +1324,13 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
   const [status, setStatus] = useState('Convoy checkpoint clearance verified');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!location.trim()) return;
     setIsSubmitting(true);
+    setSubmitError('');
     const res = await adminAddShipmentCheckpoint(shipment.id, {
       location,
       status,
@@ -1333,6 +1340,8 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
     setIsSubmitting(false);
     if (res.success && res.shipment) {
       onAdded(res.shipment);
+    } else {
+      setSubmitError(res.error || 'Waypoint could not be logged.');
     }
   };
 
@@ -1376,6 +1385,7 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
+            {submitError && <div role="alert" className="text-red-400">{submitError}</div>}
             <div className="pt-2">
               <button
                 type="submit"

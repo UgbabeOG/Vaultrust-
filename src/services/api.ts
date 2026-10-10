@@ -377,7 +377,11 @@ export async function adminUpdateVault(id: string, updates: Partial<VaultRecord>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
-    return await res.json();
+    const data = await res.json();
+    if (res.ok && data?.success && data.vault) {
+      saveBrowserRecord(browserVaultsKey, data.vault, deletedVaultsKey);
+    }
+    return data;
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error' };
   }
@@ -407,15 +411,49 @@ export async function adminDeleteVault(id: string): Promise<{ success: boolean; 
 }
 
 export async function adminAddItemToVault(vaultId: string, item: any): Promise<{ success: boolean; item?: any; vault?: VaultRecord; error?: string }> {
+  const applyLocally = () => {
+    const vaults = mergeRecords(
+      SAMPLE_VAULTS,
+      readBrowserRecords<VaultRecord>(browserVaultsKey),
+      readBrowserRecords<{ id: string }>(deletedVaultsKey),
+    );
+    const vault = vaults.find((record) => record.id.toUpperCase() === vaultId.toUpperCase());
+    if (!vault) return { success: false, error: `Vault ${vaultId} not found.` };
+    if (!item.name?.trim()) return { success: false, error: 'Item name is required.' };
+
+    const newItem = {
+      id: `ITM-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: item.name.trim(),
+      category: item.category || 'Gold Bullion',
+      description: item.description || 'Allocated custodial asset with certified assay credentials.',
+      specifications: item.specifications || 'Inspected and verified',
+      weightOrCarat: item.weightOrCarat || undefined,
+      certificationNumber: item.certificationNumber || undefined,
+      estimatedValue: item.estimatedValue || '$100,000 USD',
+      depositDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+    };
+    const updatedVault = { ...vault, items: [...vault.items, newItem] };
+    updatedVault.inventoryCount = updatedVault.items.length;
+    return saveBrowserRecord(browserVaultsKey, updatedVault, deletedVaultsKey)
+      ? { success: true, item: newItem, vault: updatedVault }
+      : { success: false, error: 'Browser storage is unavailable. The item could not be saved.' };
+  };
+
   try {
     const res = await fetch(`/api/admin/vaults/${encodeURIComponent(vaultId)}/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
-    return await res.json();
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Network error' };
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success && data.vault) {
+      saveBrowserRecord(browserVaultsKey, data.vault, deletedVaultsKey);
+      return data;
+    }
+    if (!data || res.status === 404 || res.status >= 500) return applyLocally();
+    return { success: false, error: data.error || 'Item could not be added to the vault.' };
+  } catch {
+    return applyLocally();
   }
 }
 
@@ -424,7 +462,11 @@ export async function adminDeleteItemFromVault(vaultId: string, itemId: string):
     const res = await fetch(`/api/admin/vaults/${encodeURIComponent(vaultId)}/items/${encodeURIComponent(itemId)}`, {
       method: 'DELETE',
     });
-    return await res.json();
+    const data = await res.json();
+    if (res.ok && data?.success && data.vault) {
+      saveBrowserRecord(browserVaultsKey, data.vault, deletedVaultsKey);
+    }
+    return data;
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error' };
   }
@@ -486,22 +528,58 @@ export async function adminUpdateShipment(id: string, updates: Partial<ShipmentR
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
-    return await res.json();
+    const data = await res.json();
+    if (res.ok && data?.success && data.shipment) {
+      saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
+    }
+    return data;
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error' };
   }
 }
 
 export async function adminAddShipmentCheckpoint(id: string, checkpoint: any): Promise<{ success: boolean; checkpoint?: any; shipment?: ShipmentRecord; error?: string }> {
+  const applyLocally = () => {
+    const allShipments = mergeRecords(
+      SAMPLE_SHIPMENTS,
+      readBrowserRecords<ShipmentRecord>(browserShipmentsKey),
+      readBrowserRecords<{ id: string }>(deletedShipmentsKey),
+    );
+    const shipment = allShipments.find((record) => record.id.toUpperCase() === id.toUpperCase());
+    if (!shipment) return { success: false, error: `Shipment ${id} not found.` };
+
+    const newCheckpoint = {
+      time: `${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} CET`,
+      location: checkpoint.location || 'Transit Waypoint',
+      status: checkpoint.status || 'Checkpoint verified by escort detail',
+      notes: checkpoint.notes || undefined,
+      completed: checkpoint.completed !== undefined ? Boolean(checkpoint.completed) : true,
+    };
+    const updatedShipment = {
+      ...shipment,
+      checkpoints: [...shipment.checkpoints, newCheckpoint],
+      currentCheckpoint: `${newCheckpoint.location} · ${newCheckpoint.status}`,
+    };
+    return saveBrowserRecord(browserShipmentsKey, updatedShipment, deletedShipmentsKey)
+      ? { success: true, checkpoint: newCheckpoint, shipment: updatedShipment }
+      : { success: false, error: 'Browser storage is unavailable. The waypoint could not be saved.' };
+  };
+
   try {
     const res = await fetch(`/api/admin/shipments/${encodeURIComponent(id)}/checkpoints`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(checkpoint),
     });
-    return await res.json();
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Network error' };
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success && data.shipment) {
+      saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
+      return data;
+    }
+    if (!data || res.status === 404 || res.status >= 500) return applyLocally();
+    return { success: false, error: data.error || 'Waypoint could not be logged.' };
+  } catch {
+    return applyLocally();
   }
 }
 
