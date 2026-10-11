@@ -431,6 +431,37 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
                         </div>
                       </div>
                     ))}
+                    <div className="relative">
+                      <div
+                        className={`absolute -left-[23px] sm:-left-[27px] top-1 w-6 h-6 rounded-full flex items-center justify-center ${
+                          activeRecord.shipment.transitStatus === 'Delivered & Handed Over'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                            : 'bg-[#c5a059]/20 text-[#c5a059] border border-[#c5a059]'
+                        }`}
+                      >
+                        {activeRecord.shipment.transitStatus === 'Delivered & Handed Over' ? (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        ) : (
+                          <MapPin className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                      <div className="bg-[#0a0c10] border border-[#c5a059]/40 p-4 rounded-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
+                          <span className="font-medium text-sm text-[#f5f5f7]">
+                            {activeRecord.shipment.transitStatus === 'Delivered & Handed Over'
+                              ? 'Delivered & Handed Over'
+                              : 'Final Destination'}
+                          </span>
+                          <span className="font-mono text-xs text-[#828899]">
+                            {activeRecord.shipment.estimatedDelivery}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#a0a6b7] flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3 text-[#c5a059]" />
+                          <span>{activeRecord.shipment.destination}</span>
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
