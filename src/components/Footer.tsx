@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Lock, MapPin, Phone, Mail } from 'lucide-react';
+import { Shield, Lock, MapPin, Phone, Mail, KeyRound } from 'lucide-react';
 
 interface FooterProps {
   onOpenSearch: () => void;
@@ -144,9 +144,12 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenReserve, onO
             {onOpenAdmin && (
               <button
                 onClick={onOpenAdmin}
-                className="text-[#c5a059] hover:text-[#faebd7] transition-colors flex items-center gap-1 font-mono"
+                type="button"
+                aria-label="Open registrar admin portal"
+                title="Registrar admin portal"
+                className="text-[#343946] hover:text-[#8e95a5] transition-colors opacity-50 hover:opacity-100"
               >
-                <span>[Registrar Admin Console]</span>
+                <KeyRound className="w-3 h-3" aria-hidden="true" />
               </button>
             )}
           </div>

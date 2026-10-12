@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { Shield, Menu, X, Search, Lock, Compass, KeyRound } from 'lucide-react';
+import { Shield, Menu, X, Search, Lock, Compass } from 'lucide-react';
 
 interface NavbarProps {
   onOpenSearch: () => void;
   onOpenReserve: () => void;
-  onOpenAdmin?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch, onOpenReserve, onOpenAdmin }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch, onOpenReserve }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -44,16 +43,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch, onOpenReserve, onO
 
         {/* Zone 3: 1-2 primary actions */}
         <div className="hidden sm:flex items-center gap-3">
-          {onOpenAdmin && (
-            <button
-              onClick={onOpenAdmin}
-              className="flex items-center gap-1.5 px-2.5 py-2 text-xs text-[#8e95a5] hover:text-[#faebd7] border border-[#2b3140] hover:border-[#c5a059]/60 bg-[#12151c] rounded-sm transition-colors"
-              title="Registrar Command Portal (Admin CRUD Console)"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-[#c5a059]" />
-              <span className="hidden xl:inline text-[11px] font-mono text-[#c5a059]">Admin</span>
-            </button>
-          )}
           <button
             onClick={onOpenSearch}
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium tracking-wide text-[#d4af37] bg-[#141720] border border-[#c5a059]/30 hover:border-[#c5a059] hover:bg-[#1a1f2c] rounded-sm transition-all duration-200 whitespace-nowrap"
@@ -145,18 +134,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch, onOpenReserve, onO
             >
               Reserve Vault Space
             </button>
-            {onOpenAdmin && (
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenAdmin();
-                }}
-                className="w-full py-2 text-xs font-mono text-[#c5a059] bg-[#12151c] border border-[#2b3140] hover:border-[#c5a059]/40 rounded-sm text-center flex items-center justify-center gap-2"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Registrar Admin Portal (CRUD)</span>
-              </button>
-            )}
           </div>
         </div>
       )}

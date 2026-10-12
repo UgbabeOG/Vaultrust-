@@ -69,7 +69,6 @@ export default function App() {
       <Navbar
         onOpenSearch={scrollToTracker}
         onOpenReserve={() => handleOpenReserve()}
-        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       <main className="flex-grow">
