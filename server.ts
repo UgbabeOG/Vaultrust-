@@ -11,9 +11,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const productionOrigins = ['https://valtrustsentinel.com', 'https://www.valtrustsentinel.com'];
 const allowedOrigins = new Set(
-  (process.env.CORS_ORIGINS || '')
-    .split(',')
+  [
+    ...productionOrigins,
+    ...(process.env.CORS_ORIGINS || '').split(','),
+  ]
     .map((origin) => origin.trim().replace(/\/+$/, ''))
     .filter(Boolean),
 );
