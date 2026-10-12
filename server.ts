@@ -11,6 +11,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const allowedOrigins = new Set(
+  (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean),
+);
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 type RealtimeTransport = NonNullable<
@@ -22,7 +28,32 @@ const supabase = supabaseUrl && supabaseServiceRoleKey
     })
   : null;
 
+app.use((req: Request, res: Response, next) => {
+  const origin = req.headers.origin;
+  const protocol = req.get('x-forwarded-proto')?.split(',')[0].trim() || req.protocol;
+  const isSameOrigin = origin === `${protocol}://${req.get('host')}`;
+
+  if (origin && (allowedOrigins.has(origin) || isSameOrigin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Vary', 'Origin');
+  } else if (origin) {
+    return res.status(403).json({ success: false, error: 'Origin is not allowed.' });
+  }
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 app.use(express.json());
+
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok' });
+});
 
 // In-Memory Database for Depository Operations
 interface AllocatedItem {
@@ -1207,7 +1238,9 @@ app.delete('/api/admin/reservations/:id', (req: Request, res: Response) => {
 
 // Production vs Development Mounting
 async function startServer() {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.API_ONLY === 'true') {
+    console.log('Starting API-only server');
+  } else if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (req: Request, res: Response) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));

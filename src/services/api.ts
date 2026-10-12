@@ -8,6 +8,9 @@ import {
 } from '../data/mockCustodyData';
 import { insertCheckpointBeforeFinalDestination } from '../utils/shipmentCheckpoints';
 
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+const apiUrl = (path: string) => `${apiBaseUrl}${path}`;
+
 const browserVaultsKey = 'vaultrust-admin-vaults';
 const browserShipmentsKey = 'vaultrust-admin-shipments';
 const deletedVaultsKey = 'vaultrust-admin-deleted-vaults';
@@ -181,7 +184,7 @@ export async function searchVaultOrShipment(query: string): Promise<SearchResult
   );
 
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(clean)}`);
+    const res = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(clean)}`));
     if (res.ok) {
       const data = await res.json();
       if (data.type === 'shipment' && data.shipment) {
@@ -220,7 +223,7 @@ export async function submitReservation(
   payload: ReservationPayload
 ): Promise<ReservationResponse> {
   try {
-    const res = await fetch('/api/reserve', {
+    const res = await fetch(apiUrl('/api/reserve'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -253,7 +256,7 @@ export async function submitDispatch(
   payload: DispatchPayload
 ): Promise<DispatchResponse> {
   try {
-    const res = await fetch('/api/dispatch', {
+    const res = await fetch(apiUrl('/api/dispatch'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -307,7 +310,7 @@ export async function submitProcurement(
   payload: ProcurePayload
 ): Promise<ProcureResponse> {
   try {
-    const res = await fetch('/api/procure', {
+    const res = await fetch(apiUrl('/api/procure'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -342,7 +345,7 @@ export async function submitProcurement(
 // --- VAULTS ---
 export async function adminGetVaults(): Promise<{ success: boolean; vaults: VaultRecord[] }> {
   try {
-    const res = await fetch('/api/admin/vaults');
+    const res = await fetch(apiUrl('/api/admin/vaults'));
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.vaults)) {
@@ -371,7 +374,7 @@ export async function adminGetVaults(): Promise<{ success: boolean; vaults: Vaul
 
 export async function adminCreateVault(vaultData: Partial<VaultRecord>): Promise<{ success: boolean; vault?: VaultRecord; error?: string }> {
   try {
-    const res = await fetch('/api/admin/vaults', {
+    const res = await fetch(apiUrl('/api/admin/vaults'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(vaultData),
@@ -393,7 +396,7 @@ export async function adminCreateVault(vaultData: Partial<VaultRecord>): Promise
 
 export async function adminUpdateVault(id: string, updates: Partial<VaultRecord>): Promise<{ success: boolean; vault?: VaultRecord; error?: string }> {
   try {
-    const res = await fetch(`/api/admin/vaults/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiUrl(`/api/admin/vaults/${encodeURIComponent(id)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -410,7 +413,7 @@ export async function adminUpdateVault(id: string, updates: Partial<VaultRecord>
 
 export async function adminDeleteVault(id: string): Promise<{ success: boolean; error?: string; storage?: 'server' | 'browser' }> {
   try {
-    const res = await fetch(`/api/admin/vaults/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiUrl(`/api/admin/vaults/${encodeURIComponent(id)}`), {
       method: 'DELETE',
     });
     const data = await res.json().catch(() => null);
@@ -461,7 +464,7 @@ export async function adminAddItemToVault(vaultId: string, item: any): Promise<{
   };
 
   try {
-    const res = await fetch(`/api/admin/vaults/${encodeURIComponent(vaultId)}/items`, {
+    const res = await fetch(apiUrl(`/api/admin/vaults/${encodeURIComponent(vaultId)}/items`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
@@ -480,7 +483,7 @@ export async function adminAddItemToVault(vaultId: string, item: any): Promise<{
 
 export async function adminDeleteItemFromVault(vaultId: string, itemId: string): Promise<{ success: boolean; vault?: VaultRecord; error?: string }> {
   try {
-    const res = await fetch(`/api/admin/vaults/${encodeURIComponent(vaultId)}/items/${encodeURIComponent(itemId)}`, {
+    const res = await fetch(apiUrl(`/api/admin/vaults/${encodeURIComponent(vaultId)}/items/${encodeURIComponent(itemId)}`), {
       method: 'DELETE',
     });
     const data = await res.json();
@@ -496,7 +499,7 @@ export async function adminDeleteItemFromVault(vaultId: string, itemId: string):
 // --- SHIPMENTS ---
 export async function adminGetShipments(): Promise<{ success: boolean; shipments: ShipmentRecord[] }> {
   try {
-    const res = await fetch('/api/admin/shipments');
+    const res = await fetch(apiUrl('/api/admin/shipments'));
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.shipments)) {
@@ -525,7 +528,7 @@ export async function adminGetShipments(): Promise<{ success: boolean; shipments
 
 export async function adminCreateShipment(shipmentData: Partial<ShipmentRecord>): Promise<{ success: boolean; shipment?: ShipmentRecord; error?: string }> {
   try {
-    const res = await fetch('/api/admin/shipments', {
+    const res = await fetch(apiUrl('/api/admin/shipments'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(shipmentData),
@@ -565,7 +568,7 @@ export async function adminUpdateShipment(id: string, updates: Partial<ShipmentR
   };
 
   try {
-    const res = await fetch(`/api/admin/shipments/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiUrl(`/api/admin/shipments/${encodeURIComponent(id)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -614,7 +617,7 @@ export async function adminAddShipmentCheckpoint(id: string, checkpoint: Partial
   };
 
   try {
-    const res = await fetch(`/api/admin/shipments/${encodeURIComponent(id)}/checkpoints`, {
+    const res = await fetch(apiUrl(`/api/admin/shipments/${encodeURIComponent(id)}/checkpoints`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(checkpoint),
@@ -633,7 +636,7 @@ export async function adminAddShipmentCheckpoint(id: string, checkpoint: Partial
 
 export async function adminDeleteShipment(id: string): Promise<{ success: boolean; error?: string; storage?: 'server' | 'browser' }> {
   try {
-    const res = await fetch(`/api/admin/shipments/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiUrl(`/api/admin/shipments/${encodeURIComponent(id)}`), {
       method: 'DELETE',
     });
     const data = await res.json().catch(() => null);
@@ -657,7 +660,7 @@ export async function adminDeleteShipment(id: string): Promise<{ success: boolea
 // --- RESERVATIONS ---
 export async function adminGetReservations(): Promise<{ success: boolean; reservations: any[] }> {
   try {
-    const res = await fetch('/api/admin/reservations');
+    const res = await fetch(apiUrl('/api/admin/reservations'));
     if (res.ok) return await res.json();
   } catch (err) {
     console.warn('Failed to fetch admin reservations', err);
@@ -667,7 +670,7 @@ export async function adminGetReservations(): Promise<{ success: boolean; reserv
 
 export async function adminUpdateReservation(id: string, status: string): Promise<{ success: boolean; reservation?: any; error?: string }> {
   try {
-    const res = await fetch(`/api/admin/reservations/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiUrl(`/api/admin/reservations/${encodeURIComponent(id)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -680,7 +683,7 @@ export async function adminUpdateReservation(id: string, status: string): Promis
 
 export async function adminDeleteReservation(id: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/admin/reservations/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiUrl(`/api/admin/reservations/${encodeURIComponent(id)}`), {
       method: 'DELETE',
     });
     return await res.json();
