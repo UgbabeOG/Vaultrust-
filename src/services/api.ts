@@ -51,42 +51,15 @@ function deleteBrowserRecord<T extends { id: string }>(recordsKey: string, delet
 
 function mergeRecords<T extends { id: string }>(serverRecords: T[], browserRecords: T[], deletedIds: { id: string }[]): T[] {
   const deleted = new Set(deletedIds.map((record) => record.id.toUpperCase()));
-  const recordsById = new Map(browserRecords.filter((record) => !deleted.has(record.id.toUpperCase())).map((record) => [record.id, record]));
+  const recordsById = new Map(
+    browserRecords
+      .filter((record) => !deleted.has(record.id.toUpperCase()))
+      .map((record) => [record.id.toUpperCase(), record]),
+  );
   for (const record of serverRecords) {
-    if (!deleted.has(record.id.toUpperCase()) && !recordsById.has(record.id)) recordsById.set(record.id, record);
+    if (!deleted.has(record.id.toUpperCase())) recordsById.set(record.id.toUpperCase(), record);
   }
   return [...recordsById.values()];
-}
-
-function createBrowserVault(vaultData: Partial<VaultRecord>) {
-  const id = vaultData.id?.trim().toUpperCase() || `VSG-VLT-${Math.floor(1000 + Math.random() * 9000)}`;
-  const existingVaults = readBrowserRecords<VaultRecord>(browserVaultsKey);
-  if (existingVaults.some((vault) => vault.id.toUpperCase() === id)) {
-    return { success: false, error: `Vault ${id} already exists in this browser.` };
-  }
-
-  const vault: VaultRecord = {
-    id,
-    type: 'vault',
-    vaultNumber: vaultData.vaultNumber || `CH-ZRH-${id.slice(-4)}`,
-    facility: vaultData.facility || 'Zurich Bedrock Depository — Sub-Level 4',
-    country: vaultData.country || 'Switzerland',
-    tier: vaultData.tier || 'Class II Depository Drawer',
-    status: vaultData.status || 'Allocated & Sealed',
-    securityRating: vaultData.securityRating || 'EN 1143-1 Grade XIII (Sovereign Depository)',
-    insuranceUnderwriter: vaultData.insuranceUnderwriter || "Lloyd's of London Specie Syndicate #4401",
-    coverageLimit: vaultData.coverageLimit || '$10,000,000 USD Full All-Risk Specie',
-    lastPhysicalAudit: `Audit Verified · ${new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })} (Dual-Custodian Witness)`,
-    biometricKeysRegistered: Number(vaultData.biometricKeysRegistered) || 2,
-    environmentCondition: '19.8°C · 42% RH · Inert Nitrogen Enriched',
-    inventoryCount: vaultData.items?.length || 0,
-    totalEstimatedValue: vaultData.totalEstimatedValue || '$5,000,000 USD',
-    items: vaultData.items || [],
-  };
-
-  return saveBrowserRecord(browserVaultsKey, vault, deletedVaultsKey)
-    ? { success: true, vault, storage: 'browser' as const }
-    : { success: false, error: 'Browser storage is unavailable. The vault could not be saved.' };
 }
 
 function createBrowserShipment(shipmentData: Partial<ShipmentRecord>) {
@@ -396,7 +369,7 @@ export async function adminGetVaults(): Promise<{ success: boolean; vaults: Vaul
   };
 }
 
-export async function adminCreateVault(vaultData: Partial<VaultRecord>): Promise<{ success: boolean; vault?: VaultRecord; error?: string; storage?: 'server' | 'browser' }> {
+export async function adminCreateVault(vaultData: Partial<VaultRecord>): Promise<{ success: boolean; vault?: VaultRecord; error?: string }> {
   try {
     const res = await fetch('/api/admin/vaults', {
       method: 'POST',
@@ -405,13 +378,16 @@ export async function adminCreateVault(vaultData: Partial<VaultRecord>): Promise
     });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.success && data.vault) {
-      saveBrowserRecord(browserVaultsKey, data.vault, deletedVaultsKey);
-      return { ...data, storage: 'server' };
+      return data;
     }
-    if (res.status === 404 || res.status >= 500 || !data) return createBrowserVault(vaultData);
-    return { success: false, error: data.error || 'Vault could not be created.' };
-  } catch {
-    return createBrowserVault(vaultData);
+    return { success: false, error: data?.error || `Vault could not be saved to the database (HTTP ${res.status}).` };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error
+        ? `Vault could not be saved to the database: ${err.message}`
+        : 'Vault could not be saved to the database.',
+    };
   }
 }
 
@@ -547,7 +523,7 @@ export async function adminGetShipments(): Promise<{ success: boolean; shipments
   };
 }
 
-export async function adminCreateShipment(shipmentData: Partial<ShipmentRecord>): Promise<{ success: boolean; shipment?: ShipmentRecord; error?: string; storage?: 'server' | 'browser' }> {
+export async function adminCreateShipment(shipmentData: Partial<ShipmentRecord>): Promise<{ success: boolean; shipment?: ShipmentRecord; error?: string }> {
   try {
     const res = await fetch('/api/admin/shipments', {
       method: 'POST',
@@ -556,13 +532,16 @@ export async function adminCreateShipment(shipmentData: Partial<ShipmentRecord>)
     });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.success && data.shipment) {
-      saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
-      return { ...data, storage: 'server' };
+      return data;
     }
-    if (res.status === 404 || res.status >= 500 || !data) return createBrowserShipment(shipmentData);
-    return { success: false, error: data.error || 'Shipment could not be created.' };
-  } catch {
-    return createBrowserShipment(shipmentData);
+    return { success: false, error: data?.error || `Shipment could not be saved to the database (HTTP ${res.status}).` };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error
+        ? `Shipment could not be saved to the database: ${err.message}`
+        : 'Shipment could not be saved to the database.',
+    };
   }
 }
 

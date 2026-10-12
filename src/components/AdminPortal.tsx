@@ -610,12 +610,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         {isCreateVaultOpen && (
           <CreateVaultModal
             onClose={() => setIsCreateVaultOpen(false)}
-            onCreated={(vault, storage) => {
+            onCreated={(vault) => {
               setVaults((prev) => [vault, ...prev]);
               setIsCreateVaultOpen(false);
-              showFeedback(storage === 'browser'
-                ? `Vault ${vault.id} saved on this device only; the server API is unavailable.`
-                : `Vault ${vault.id} created.`);
+              showFeedback(`Vault ${vault.id} created and saved to the database.`);
               if (onVaultOrShipmentUpdated) onVaultOrShipmentUpdated(vault.id);
             }}
           />
@@ -653,12 +651,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         {isCreateShipmentOpen && (
           <CreateShipmentModal
             onClose={() => setIsCreateShipmentOpen(false)}
-            onCreated={(shipment, storage) => {
+            onCreated={(shipment) => {
               setShipments((prev) => [shipment, ...prev]);
               setIsCreateShipmentOpen(false);
-              showFeedback(storage === 'browser'
-                ? `Shipment ${shipment.id} saved on this device only; the server API is unavailable.`
-                : `Shipment ${shipment.id} created.`);
+              showFeedback(`Shipment ${shipment.id} created and saved to the database.`);
               if (onVaultOrShipmentUpdated) onVaultOrShipmentUpdated(shipment.id);
             }}
           />
@@ -767,7 +763,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
 // --- SUB-MODALS FOR SPECIFIC CRUD FORMS ---
 
-function CreateVaultModal({ onClose, onCreated }: { onClose: () => void; onCreated: (vault: VaultRecord, storage?: 'server' | 'browser') => void }) {
+function CreateVaultModal({ onClose, onCreated }: { onClose: () => void; onCreated: (vault: VaultRecord) => void }) {
   const [vaultId, setVaultId] = useState(`VSG-VLT-${Math.floor(1000 + Math.random() * 9000)}`);
   const [facility, setFacility] = useState('Zurich Bedrock Depository — Sub-Level 4');
   const [tier, setTier] = useState('Class II Depository Drawer');
@@ -791,7 +787,7 @@ function CreateVaultModal({ onClose, onCreated }: { onClose: () => void; onCreat
     });
     setIsSubmitting(false);
     if (res.success && res.vault) {
-      onCreated(res.vault, res.storage);
+      onCreated(res.vault);
     } else {
       setSubmitError(res.error || 'Vault could not be created.');
     }
@@ -1112,7 +1108,7 @@ function ManageVaultItemsModal({ vault, onClose, onVaultUpdated }: { vault: Vaul
   );
 }
 
-function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCreated: (s: ShipmentRecord, storage?: 'server' | 'browser') => void }) {
+function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCreated: (s: ShipmentRecord) => void }) {
   const [trackingNumber, setTrackingNumber] = useState(`TRK-ARM-${Math.floor(1000 + Math.random() * 9000)}`);
   const [manifest, setManifest] = useState('Armored Safe-Hand Escort: Allocated Gold Bars & Gems');
   const [origin, setOrigin] = useState('Valtrust Zurich Bedrock Depository (Switzerland)');
@@ -1138,7 +1134,7 @@ function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCr
     });
     setIsSubmitting(false);
     if (res.success && res.shipment) {
-      onCreated(res.shipment, res.storage);
+      onCreated(res.shipment);
     } else {
       setSubmitError(res.error || 'Shipment could not be created.');
     }

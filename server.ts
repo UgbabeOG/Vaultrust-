@@ -1,6 +1,8 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
 import { insertCheckpointBeforeFinalDestination } from './src/utils/shipmentCheckpoints';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -8,6 +10,11 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = supabaseUrl && supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey)
+  : null;
 
 app.use(express.json());
 
@@ -326,6 +333,97 @@ const shipments: ShipmentRecord[] = [
 const reservations: ReservationRecord[] = [];
 const procurementOrders: any[] = [];
 
+type CustodyRecord = VaultRecord | ShipmentRecord;
+
+async function hydrateCustodyRecords(): Promise<void> {
+  if (!supabase) return;
+
+  const { data, error } = await supabase
+    .from('custody_records')
+    .select('id, record_type, payload');
+
+  if (error) throw error;
+
+  for (const row of data || []) {
+    if (row.record_type === 'vault') {
+      const record = row.payload as VaultRecord;
+      const index = vaults.findIndex((item) => item.id.toUpperCase() === row.id.toUpperCase());
+      if (index === -1) vaults.unshift(record);
+      else vaults[index] = record;
+    } else if (row.record_type === 'shipment') {
+      const record = row.payload as ShipmentRecord;
+      const index = shipments.findIndex((item) => item.id.toUpperCase() === row.id.toUpperCase());
+      if (index === -1) shipments.unshift(record);
+      else shipments[index] = record;
+    }
+  }
+}
+
+async function saveCustodyRecord(record: CustodyRecord): Promise<string | undefined> {
+  if (!supabase) return 'Persistent database is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.';
+
+  try {
+    const { error } = await supabase
+      .from('custody_records')
+      .upsert({
+        id: record.id,
+        record_type: record.type,
+        payload: record,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+    return error?.message;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Unknown database error.';
+  }
+}
+
+async function insertCustodyRecord(record: CustodyRecord): Promise<string | undefined> {
+  if (!supabase) return 'Persistent database is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.';
+
+  try {
+    const { error } = await supabase
+      .from('custody_records')
+      .insert({
+        id: record.id,
+        record_type: record.type,
+        payload: record,
+      });
+
+    return error?.message;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Unknown database error.';
+  }
+}
+
+async function removeCustodyRecord(id: string): Promise<string | undefined> {
+  if (!supabase) return undefined;
+
+  try {
+    const { error } = await supabase
+      .from('custody_records')
+      .delete()
+      .eq('id', id);
+
+    return error?.message;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Unknown database error.';
+  }
+}
+
+app.use(['/api/search', '/api/admin/vaults', '/api/admin/shipments'], async (_req, res, next) => {
+  try {
+    await hydrateCustodyRecords();
+    next();
+  } catch (error) {
+    console.error('Failed to load custody records from Supabase', error);
+    res.status(503).json({
+      success: false,
+      error: 'The persistent custody database could not be read. Please try again.',
+    });
+  }
+});
+
 // API ENDPOINTS
 
 // 1. Health check & depository stats
@@ -624,7 +722,7 @@ app.get('/api/admin/vaults', (req: Request, res: Response) => {
 });
 
 // Create new vault (Admin)
-app.post('/api/admin/vaults', (req: Request, res: Response) => {
+app.post('/api/admin/vaults', async (req: Request, res: Response) => {
   const {
     id,
     vaultNumber,
@@ -669,6 +767,15 @@ app.post('/api/admin/vaults', (req: Request, res: Response) => {
     items: Array.isArray(items) ? items : [],
   };
 
+  const databaseError = await insertCustodyRecord(newVault);
+  if (databaseError) {
+    console.error(`Failed to persist vault ${newVault.id}`, databaseError);
+    return res.status(supabase ? 500 : 503).json({
+      success: false,
+      error: `Vault could not be saved to the persistent database: ${databaseError}`,
+    });
+  }
+
   vaults.unshift(newVault);
 
   res.status(201).json({
@@ -679,7 +786,7 @@ app.post('/api/admin/vaults', (req: Request, res: Response) => {
 });
 
 // Update vault (Admin)
-app.put('/api/admin/vaults/:id', (req: Request, res: Response) => {
+app.put('/api/admin/vaults/:id', async (req: Request, res: Response) => {
   const vaultId = req.params.id.toUpperCase();
   const index = vaults.findIndex((v) => v.id.toUpperCase() === vaultId);
 
@@ -703,7 +810,7 @@ app.put('/api/admin/vaults/:id', (req: Request, res: Response) => {
     lastPhysicalAudit,
   } = req.body;
 
-  vaults[index] = {
+  const updatedVault: VaultRecord = {
     ...current,
     facility: facility !== undefined ? facility : current.facility,
     tier: tier !== undefined ? tier : current.tier,
@@ -716,15 +823,22 @@ app.put('/api/admin/vaults/:id', (req: Request, res: Response) => {
     lastPhysicalAudit: lastPhysicalAudit !== undefined ? lastPhysicalAudit : current.lastPhysicalAudit,
   };
 
+  const databaseError = await saveCustodyRecord(updatedVault);
+  if (databaseError) {
+    console.error(`Failed to persist vault ${vaultId}`, databaseError);
+    return res.status(500).json({ success: false, error: `Vault could not be saved: ${databaseError}` });
+  }
+
+  vaults[index] = updatedVault;
   res.json({
     success: true,
-    vault: vaults[index],
+    vault: updatedVault,
     message: `Vault ${vaultId} updated successfully.`,
   });
 });
 
 // Delete / De-allocate vault (Admin)
-app.delete('/api/admin/vaults/:id', (req: Request, res: Response) => {
+app.delete('/api/admin/vaults/:id', async (req: Request, res: Response) => {
   const vaultId = req.params.id.toUpperCase();
   const index = vaults.findIndex((v) => v.id.toUpperCase() === vaultId);
 
@@ -735,7 +849,13 @@ app.delete('/api/admin/vaults/:id', (req: Request, res: Response) => {
     });
   }
 
-  const removed = vaults.splice(index, 1)[0];
+  const databaseError = await removeCustodyRecord(vaultId);
+  if (databaseError) {
+    console.error(`Failed to delete vault ${vaultId} from Supabase`, databaseError);
+    return res.status(500).json({ success: false, error: `Vault could not be deleted: ${databaseError}` });
+  }
+
+  vaults.splice(index, 1);
 
   res.json({
     success: true,
@@ -745,7 +865,7 @@ app.delete('/api/admin/vaults/:id', (req: Request, res: Response) => {
 });
 
 // Add Item to Vault (Admin)
-app.post('/api/admin/vaults/:id/items', (req: Request, res: Response) => {
+app.post('/api/admin/vaults/:id/items', async (req: Request, res: Response) => {
   const vaultId = req.params.id.toUpperCase();
   const vault = vaults.find((v) => v.id.toUpperCase() === vaultId);
 
@@ -785,19 +905,28 @@ app.post('/api/admin/vaults/:id/items', (req: Request, res: Response) => {
     depositDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
   };
 
-  vault.items.push(newItem);
-  vault.inventoryCount = vault.items.length;
+  const updatedVault: VaultRecord = {
+    ...vault,
+    items: [...vault.items, newItem],
+    inventoryCount: vault.items.length + 1,
+  };
+  const databaseError = await saveCustodyRecord(updatedVault);
+  if (databaseError) {
+    console.error(`Failed to persist item in vault ${vaultId}`, databaseError);
+    return res.status(500).json({ success: false, error: `Vault item could not be saved: ${databaseError}` });
+  }
+  vaults[vaults.indexOf(vault)] = updatedVault;
 
   res.status(201).json({
     success: true,
     item: newItem,
-    vault,
+    vault: updatedVault,
     message: `Item added to vault ${vaultId}.`,
   });
 });
 
 // Remove Item from Vault (Admin)
-app.delete('/api/admin/vaults/:id/items/:itemId', (req: Request, res: Response) => {
+app.delete('/api/admin/vaults/:id/items/:itemId', async (req: Request, res: Response) => {
   const vaultId = req.params.id.toUpperCase();
   const itemId = req.params.itemId;
   const vault = vaults.find((v) => v.id.toUpperCase() === vaultId);
@@ -811,13 +940,19 @@ app.delete('/api/admin/vaults/:id/items/:itemId', (req: Request, res: Response) 
     return res.status(404).json({ success: false, error: `Item ${itemId} not found in vault.` });
   }
 
-  vault.items.splice(itemIndex, 1);
-  vault.inventoryCount = vault.items.length;
+  const items = vault.items.filter((item) => item.id !== itemId);
+  const updatedVault: VaultRecord = { ...vault, items, inventoryCount: items.length };
+  const databaseError = await saveCustodyRecord(updatedVault);
+  if (databaseError) {
+    console.error(`Failed to persist item deletion in vault ${vaultId}`, databaseError);
+    return res.status(500).json({ success: false, error: `Vault item could not be deleted: ${databaseError}` });
+  }
+  vaults[vaults.indexOf(vault)] = updatedVault;
 
   res.json({
     success: true,
     message: `Item ${itemId} removed from vault ${vaultId}.`,
-    vault,
+    vault: updatedVault,
   });
 });
 
@@ -833,7 +968,7 @@ app.get('/api/admin/shipments', (req: Request, res: Response) => {
 });
 
 // Create new shipment dispatch (Admin)
-app.post('/api/admin/shipments', (req: Request, res: Response) => {
+app.post('/api/admin/shipments', async (req: Request, res: Response) => {
   const {
     trackingNumber,
     manifestDescription,
@@ -886,6 +1021,15 @@ app.post('/api/admin/shipments', (req: Request, res: Response) => {
     ],
   };
 
+  const databaseError = await insertCustodyRecord(newShipment);
+  if (databaseError) {
+    console.error(`Failed to persist shipment ${newShipment.id}`, databaseError);
+    return res.status(supabase ? 500 : 503).json({
+      success: false,
+      error: `Shipment could not be saved to the persistent database: ${databaseError}`,
+    });
+  }
+
   shipments.unshift(newShipment);
 
   res.status(201).json({
@@ -896,7 +1040,7 @@ app.post('/api/admin/shipments', (req: Request, res: Response) => {
 });
 
 // Update shipment (Admin)
-app.put('/api/admin/shipments/:id', (req: Request, res: Response) => {
+app.put('/api/admin/shipments/:id', async (req: Request, res: Response) => {
   const trk = req.params.id.toUpperCase();
   const index = shipments.findIndex((s) => s.id.toUpperCase() === trk || s.trackingNumber.toUpperCase() === trk);
 
@@ -914,7 +1058,7 @@ app.put('/api/admin/shipments/:id', (req: Request, res: Response) => {
     leadCourier,
   } = req.body;
 
-  shipments[index] = {
+  const updatedShipment: ShipmentRecord = {
     ...current,
     transitStatus: transitStatus !== undefined ? transitStatus : current.transitStatus,
     currentCheckpoint: currentCheckpoint !== undefined ? currentCheckpoint : current.currentCheckpoint,
@@ -924,15 +1068,22 @@ app.put('/api/admin/shipments/:id', (req: Request, res: Response) => {
     leadCourier: leadCourier !== undefined ? leadCourier : current.leadCourier,
   };
 
+  const databaseError = await saveCustodyRecord(updatedShipment);
+  if (databaseError) {
+    console.error(`Failed to persist shipment ${trk}`, databaseError);
+    return res.status(500).json({ success: false, error: `Shipment could not be saved: ${databaseError}` });
+  }
+
+  shipments[index] = updatedShipment;
   res.json({
     success: true,
-    shipment: shipments[index],
+    shipment: updatedShipment,
     message: `Shipment ${trk} updated successfully.`,
   });
 });
 
 // Add waypoint checkpoint to shipment (Admin)
-app.post('/api/admin/shipments/:id/checkpoints', (req: Request, res: Response) => {
+app.post('/api/admin/shipments/:id/checkpoints', async (req: Request, res: Response) => {
   const trk = req.params.id.toUpperCase();
   const shipment = shipments.find((s) => s.id.toUpperCase() === trk || s.trackingNumber.toUpperCase() === trk);
 
@@ -950,28 +1101,43 @@ app.post('/api/admin/shipments/:id/checkpoints', (req: Request, res: Response) =
     completed: completed !== undefined ? Boolean(completed) : false,
   };
 
-  shipment.checkpoints = insertCheckpointBeforeFinalDestination(
-    shipment.checkpoints,
-    newCheckpoint,
-    shipment.destination,
-  );
-  shipment.currentCheckpoint = `${newCheckpoint.location} · ${newCheckpoint.status}`;
+  const updatedShipment: ShipmentRecord = {
+    ...shipment,
+    checkpoints: insertCheckpointBeforeFinalDestination(
+      shipment.checkpoints,
+      newCheckpoint,
+      shipment.destination,
+    ),
+    currentCheckpoint: `${newCheckpoint.location} · ${newCheckpoint.status}`,
+  };
+  const databaseError = await saveCustodyRecord(updatedShipment);
+  if (databaseError) {
+    console.error(`Failed to persist waypoint for shipment ${trk}`, databaseError);
+    return res.status(500).json({ success: false, error: `Waypoint could not be saved: ${databaseError}` });
+  }
+  shipments[shipments.indexOf(shipment)] = updatedShipment;
 
   res.status(201).json({
     success: true,
     checkpoint: newCheckpoint,
-    shipment,
+    shipment: updatedShipment,
     message: `Checkpoint logged for shipment ${trk}.`,
   });
 });
 
 // Delete / Archive shipment (Admin)
-app.delete('/api/admin/shipments/:id', (req: Request, res: Response) => {
+app.delete('/api/admin/shipments/:id', async (req: Request, res: Response) => {
   const trk = req.params.id.toUpperCase();
   const index = shipments.findIndex((s) => s.id.toUpperCase() === trk || s.trackingNumber.toUpperCase() === trk);
 
   if (index === -1) {
     return res.status(404).json({ success: false, error: `Shipment ${trk} not found.` });
+  }
+
+  const databaseError = await removeCustodyRecord(trk);
+  if (databaseError) {
+    console.error(`Failed to delete shipment ${trk} from Supabase`, databaseError);
+    return res.status(500).json({ success: false, error: `Shipment could not be deleted: ${databaseError}` });
   }
 
   shipments.splice(index, 1);
