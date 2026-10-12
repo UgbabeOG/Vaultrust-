@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import { insertCheckpointBeforeFinalDestination } from './src/utils/shipmentCheckpoints';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,8 +13,13 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+type RealtimeTransport = NonNullable<
+  NonNullable<Parameters<typeof createClient>[2]>['realtime']
+>['transport'];
 const supabase = supabaseUrl && supabaseServiceRoleKey
-  ? createClient(supabaseUrl, supabaseServiceRoleKey)
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      realtime: { transport: WebSocket as unknown as RealtimeTransport },
+    })
   : null;
 
 app.use(express.json());
