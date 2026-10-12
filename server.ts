@@ -908,10 +908,10 @@ app.post('/api/admin/shipments', (req: Request, res: Response) => {
     vaultOriginId,
   } = req.body;
 
-  if (!manifestDescription || !destination) {
+  if (!manifestDescription || !destination || typeof transitStatus !== 'string' || !transitStatus.trim()) {
     return res.status(400).json({
       success: false,
-      error: 'Manifest description and destination are required.',
+      error: 'Manifest description, destination, and shipment status are required.',
     });
   }
 
@@ -925,7 +925,7 @@ app.post('/api/admin/shipments', (req: Request, res: Response) => {
     originFacility: originFacility || 'Valtrust Zurich Bedrock Depository (Switzerland)',
     destination,
     courierLevel: courierLevel || 'Level 5 Armed Convoy',
-    transitStatus: transitStatus || 'In Transit',
+    transitStatus: transitStatus.trim(),
     currentCheckpoint: `${originFacility || 'Zurich Sally Port'} · Satellite Telemetry Active`,
     estimatedDelivery: 'Within 6 Hours (Safe-Hand Protocol)',
     securityTeamCallsign: securityTeamCallsign || 'Sentinel Shield Unit Bravo',

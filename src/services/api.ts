@@ -95,8 +95,8 @@ function createBrowserShipment(shipmentData: Partial<ShipmentRecord>) {
   if (existingShipments.some((shipment) => shipment.id.toUpperCase() === trackingNumber)) {
     return { success: false, error: `Shipment ${trackingNumber} already exists in this browser.` };
   }
-  if (!shipmentData.manifestDescription || !shipmentData.destination) {
-    return { success: false, error: 'Manifest description and destination are required.' };
+  if (!shipmentData.manifestDescription || !shipmentData.destination || !shipmentData.transitStatus?.trim()) {
+    return { success: false, error: 'Manifest description, destination, and shipment status are required.' };
   }
 
   const originFacility = shipmentData.originFacility || 'Valtrust Zurich Bedrock Depository (Switzerland)';
@@ -108,7 +108,7 @@ function createBrowserShipment(shipmentData: Partial<ShipmentRecord>) {
     originFacility,
     destination: shipmentData.destination,
     courierLevel: shipmentData.courierLevel || 'Level 5 Armed Convoy',
-    transitStatus: shipmentData.transitStatus || 'In Transit',
+    transitStatus: shipmentData.transitStatus.trim(),
     currentCheckpoint: `${originFacility} · Satellite Telemetry Active`,
     estimatedDelivery: 'Within 6 Hours (Safe-Hand Protocol)',
     securityTeamCallsign: shipmentData.securityTeamCallsign || 'Sentinel Shield Unit Bravo',

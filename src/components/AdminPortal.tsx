@@ -158,15 +158,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     });
   };
 
-  const handleUpdateShipmentStatus = async (id: string, newStatus: string) => {
-    const res = await adminUpdateShipment(id, { transitStatus: newStatus });
-    if (res.success && res.shipment) {
-      setShipments((prev) => prev.map((s) => (s.id === id ? res.shipment! : s)));
-      showFeedback(`Shipment ${id} status advanced to: ${newStatus}`);
-      if (onVaultOrShipmentUpdated) onVaultOrShipmentUpdated(id);
-    }
-  };
-
   // --- RESERVATION CRUD HANDLERS ---
   const handleUpdateReservationStatus = async (id: string, status: string) => {
     const res = await adminUpdateReservation(id, status);
@@ -506,18 +497,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                       {/* CRUD Actions */}
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        {/* Status Quick Advance Dropdown */}
-                        <select
-                          value={shipment.transitStatus}
-                          onChange={(e) => handleUpdateShipmentStatus(shipment.id, e.target.value)}
-                          className="px-2 py-1.5 bg-[#141822] border border-[#2b3140] text-xs text-[#f5f5f7] rounded-sm focus:outline-none"
-                        >
-                          <option value="In Transit">In Transit</option>
-                          <option value="Cleared Customs / Apron Transfer">Cleared Customs</option>
-                          <option value="Dispatched Final Mile">Dispatched Final Mile</option>
-                          <option value="Delivered & Handed Over">Delivered & Handed Over</option>
-                        </select>
-
                         <button
                           onClick={() => setCheckpointShipment(shipment)}
                           className="px-2.5 py-1.5 text-xs font-medium text-[#7aa2f7] bg-[#141822] border border-[#2b3140] hover:border-[#7aa2f7]/50 rounded-sm transition-colors flex items-center gap-1.5"
@@ -1138,6 +1117,7 @@ function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [manifest, setManifest] = useState('Armored Safe-Hand Escort: Allocated Gold Bars & Gems');
   const [origin, setOrigin] = useState('Valtrust Zurich Bedrock Depository (Switzerland)');
   const [destination, setDestination] = useState('Private Villa · Geneva, Switzerland');
+  const [status, setStatus] = useState('');
   const [courierLevel, setCourierLevel] = useState('Level 5 Armed Convoy');
   const [leadCourier, setLeadCourier] = useState('Captain M. von Berg');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1152,6 +1132,7 @@ function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCr
       manifestDescription: manifest,
       originFacility: origin,
       destination,
+      transitStatus: status.trim(),
       courierLevel,
       leadCourier,
     });
@@ -1192,12 +1173,23 @@ function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCr
               />
             </div>
             <div>
-              <label className="block text-[#828899] mb-1">Destination Address / Apron</label>
+              <label className="block text-[#828899] mb-1">Delivery / Final Destination</label>
               <input
                 type="text"
                 required
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[#828899] mb-1">Shipment Status</label>
+              <input
+                type="text"
+                required
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                placeholder="Enter the current shipment status"
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
@@ -1298,17 +1290,15 @@ function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: Shipmen
         <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0">
           <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             <div>
-              <label className="block text-[#828899] mb-1">Transit Status</label>
-              <select
+              <label className="block text-[#828899] mb-1">Shipment Status</label>
+              <input
+                type="text"
+                required
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
+                placeholder="Enter the current shipment status"
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
-              >
-                <option value="In Transit">In Transit</option>
-                <option value="Cleared Customs / Apron Transfer">Cleared Customs / Apron Transfer</option>
-                <option value="Dispatched Final Mile">Dispatched Final Mile</option>
-                <option value="Delivered & Handed Over">Delivered & Handed Over</option>
-              </select>
+              />
             </div>
             <div>
               <label className="block text-[#828899] mb-1">Current Checkpoint Location</label>
