@@ -28,6 +28,16 @@ function isShipmentDelivered(status: string): boolean {
   return !/\bnot\s+delivered\b/i.test(status) && /\b(delivered|handed over|delivery complete)\b/i.test(status);
 }
 
+function getCurrentCheckpoint(shipment: ShipmentRecord) {
+  return (
+    shipment.checkpoints.find(
+      (checkpoint) => `${checkpoint.location} · ${checkpoint.status}` === shipment.currentCheckpoint,
+    ) ||
+    shipment.checkpoints.find((checkpoint) => !checkpoint.completed) ||
+    shipment.checkpoints[shipment.checkpoints.length - 1]
+  );
+}
+
 interface VaultSearchTrackerProps {
   onScheduleDispatch: (vaultId: string, preselectedItems?: string[]) => void;
   onRequestSalonVisit: (vaultId: string) => void;
@@ -46,6 +56,9 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
     vault?: VaultRecord;
     shipment?: ShipmentRecord;
   }>({ type: 'idle' });
+  const currentCheckpoint = activeRecord.shipment
+    ? getCurrentCheckpoint(activeRecord.shipment)
+    : undefined;
 
   // Sync externalQuery if passed from dispatch confirmation or admin update
   React.useEffect(() => {
@@ -313,6 +326,18 @@ export const VaultSearchTracker: React.FC<VaultSearchTrackerProps> = ({
                     <span className="text-sm font-medium text-[#f5f5f7]">
                       {activeRecord.shipment.destination}
                     </span>
+                    {currentCheckpoint && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-[11px] text-[#a0a6b7]">
+                          Current status: {currentCheckpoint.status}
+                        </p>
+                        {currentCheckpoint.notes && (
+                          <p className="text-[11px] text-[#6e7587]">
+                            Security notes: {currentCheckpoint.notes}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

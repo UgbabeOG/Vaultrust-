@@ -1235,18 +1235,27 @@ function CreateShipmentModal({ onClose, onCreated }: { onClose: () => void; onCr
 
 function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: ShipmentRecord; onClose: () => void; onUpdated: (s: ShipmentRecord) => void }) {
   const [status, setStatus] = useState(shipment.transitStatus);
-  const checkpointIndex = (() => {
+  const [checkpointIndex, setCheckpointIndex] = useState(() => {
     const activeIndex = shipment.checkpoints.findIndex((item) => !item.completed);
     return activeIndex === -1 ? shipment.checkpoints.length - 1 : activeIndex;
-  })();
+  });
   const currentCheckpoint = shipment.checkpoints[checkpointIndex];
   const [checkpointLocation, setCheckpointLocation] = useState(currentCheckpoint?.location || '');
   const [checkpointStatus, setCheckpointStatus] = useState(currentCheckpoint?.status || '');
   const [checkpointNotes, setCheckpointNotes] = useState(currentCheckpoint?.notes || '');
+  const [checkpointCompleted, setCheckpointCompleted] = useState(currentCheckpoint?.completed ?? false);
   const [eta, setEta] = useState(shipment.estimatedDelivery);
   const [callsign, setCallsign] = useState(shipment.securityTeamCallsign);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  useEffect(() => {
+    const selectedCheckpoint = shipment.checkpoints[checkpointIndex];
+    setCheckpointLocation(selectedCheckpoint?.location || '');
+    setCheckpointStatus(selectedCheckpoint?.status || '');
+    setCheckpointNotes(selectedCheckpoint?.notes || '');
+    setCheckpointCompleted(selectedCheckpoint?.completed ?? false);
+  }, [checkpointIndex, shipment.checkpoints]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1257,7 +1266,7 @@ function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: Shipmen
       time: currentCheckpoint?.time || 'Immediate',
       location: checkpointLocation.trim(),
       status: checkpointStatus.trim(),
-      completed: currentCheckpoint?.completed ?? false,
+      completed: checkpointCompleted,
       notes: checkpointNotes.trim() || undefined,
     };
     if (checkpointIndex === -1) {
@@ -1301,6 +1310,21 @@ function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: Shipmen
               />
             </div>
             <div>
+              <label className="block text-[#828899] mb-1">Checkpoint to Edit</label>
+              <select
+                value={checkpointIndex}
+                onChange={(e) => setCheckpointIndex(Number(e.target.value))}
+                disabled={shipment.checkpoints.length === 0}
+                className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
+              >
+                {shipment.checkpoints.map((checkpoint, index) => (
+                  <option key={`${checkpoint.time}-${index}`} value={index}>
+                    {checkpoint.time} — {checkpoint.location}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-[#828899] mb-1">Current Checkpoint Location</label>
               <input
                 type="text"
@@ -1329,6 +1353,15 @@ function EditShipmentModal({ shipment, onClose, onUpdated }: { shipment: Shipmen
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
+            <label className="flex items-center gap-2 text-[#a0a6b7]">
+              <input
+                type="checkbox"
+                checked={checkpointCompleted}
+                onChange={(e) => setCheckpointCompleted(e.target.checked)}
+                className="accent-emerald-500"
+              />
+              Mark this checkpoint as completed
+            </label>
             <div>
               <label className="block text-[#828899] mb-1">Estimated Handover Time</label>
               <input
@@ -1359,6 +1392,7 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
   const [location, setLocation] = useState('');
   const [status, setStatus] = useState('Convoy checkpoint clearance verified');
   const [notes, setNotes] = useState('');
+  const [completed, setCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
@@ -1371,7 +1405,7 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
       location,
       status,
       notes,
-      completed: true,
+      completed,
     });
     setIsSubmitting(false);
     if (res.success && res.shipment) {
@@ -1421,6 +1455,15 @@ function AddWaypointModal({ shipment, onClose, onAdded }: { shipment: ShipmentRe
                 className="w-full px-3 py-2 bg-[#080a0f] border border-[#232733] text-[#f5f5f7] rounded-sm"
               />
             </div>
+            <label className="flex items-center gap-2 text-[#a0a6b7]">
+              <input
+                type="checkbox"
+                checked={completed}
+                onChange={(e) => setCompleted(e.target.checked)}
+                className="accent-emerald-500"
+              />
+              Mark this waypoint as completed
+            </label>
             {submitError && <div role="alert" className="text-red-400">{submitError}</div>}
             <div className="pt-2">
               <button

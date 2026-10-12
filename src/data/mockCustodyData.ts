@@ -400,52 +400,6 @@ export function lookupCustodyRecord(query: string): {
     };
   }
 
-  // If user typed something looking like a shipment tracking ID (TRK, ARM, AIR, or number)
-  if (clean.includes('TRK') || clean.includes('TRACK') || clean.includes('ARM') || clean.includes('AIR') || clean.length >= 5) {
-    return {
-      type: 'shipment',
-      shipment: {
-        id: clean.startsWith('TRK-') ? clean : `TRK-ARM-${clean.replace(/[^0-9]/g, '').padEnd(4, '3').slice(0, 4)}`,
-        type: 'shipment',
-        trackingNumber: clean.startsWith('TRK-') ? clean : `TRK-ARM-${clean.replace(/[^0-9]/g, '').padEnd(4, '3').slice(0, 4)}`,
-        manifestDescription: 'Secure Armored Escort: High-Value Precious Specie & Allocated Custodial Assets',
-        originFacility: 'Valtrust Central Depository Secure Sally Port',
-        destination: 'Client Designated Secure Receiving Destination',
-        courierLevel: 'Level 5 Armed Convoy',
-        transitStatus: 'In Transit',
-        currentCheckpoint: 'Regional Armored Corridor · Secure Convoy Waypoint',
-        estimatedDelivery: 'Within 4 Hours (Discreet Safe-Hand Protocol)',
-        securityTeamCallsign: 'Sentinel Tactical Escort 07',
-        leadCourier: 'Officer J. St. Claire (Custody Officer)',
-        biometricSealVerified: true,
-        vaultOriginId: 'VSG-VLT-ALLOCATED',
-        checkpoints: [
-          {
-            time: 'Extraction Complete',
-            location: 'Central Vault Depository Sub-Level',
-            status: 'Dual Biometric Unseal & Armor Case Handover',
-            completed: true,
-            notes: 'Tamper-evident seals inspected and verified.',
-          },
-          {
-            time: 'En Route',
-            location: 'Armored Transit Corridor',
-            status: 'Convoy Satellite Telemetry & Armed Security Active',
-            completed: true,
-            notes: 'Continuous encrypted radio telemetry with Valtrust Command Desk.',
-          },
-          {
-            time: 'Pending Safe-Hand',
-            location: 'Designated Handover Location',
-            status: 'Biometric Handover & Final Custody Release',
-            completed: false,
-            notes: 'Dual sign-off upon physical inspection.',
-          },
-        ],
-      },
-    };
-  }
-
   return { type: 'not_found' };
 }
 

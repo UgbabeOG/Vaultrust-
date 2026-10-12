@@ -219,6 +219,9 @@ export async function searchVaultOrShipment(query: string): Promise<SearchResult
           saveBrowserRecord(browserShipmentsKey, data.shipment, deletedShipmentsKey);
         }
       }
+      if (data.type === 'not_found' && localShipment) {
+        return { success: true, type: 'shipment', shipment: localShipment };
+      }
       return data;
     }
   } catch (err) {
@@ -615,7 +618,7 @@ export async function adminAddShipmentCheckpoint(id: string, checkpoint: Partial
       location: checkpoint.location || 'Transit Waypoint',
       status: checkpoint.status || 'Checkpoint verified by escort detail',
       notes: checkpoint.notes || undefined,
-      completed: checkpoint.completed !== undefined ? Boolean(checkpoint.completed) : true,
+      completed: checkpoint.completed !== undefined ? Boolean(checkpoint.completed) : false,
     };
     const updatedShipment = {
       ...shipment,
