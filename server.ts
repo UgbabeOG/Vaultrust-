@@ -1021,14 +1021,32 @@ app.post('/api/admin/shipments', async (req: Request, res: Response) => {
     vaultOriginId,
   } = req.body;
 
-  if (!manifestDescription || !destination || typeof transitStatus !== 'string' || !transitStatus.trim()) {
+  if (
+    typeof manifestDescription !== 'string' ||
+    !manifestDescription.trim() ||
+    typeof destination !== 'string' ||
+    !destination.trim() ||
+    typeof transitStatus !== 'string' ||
+    !transitStatus.trim()
+  ) {
     return res.status(400).json({
       success: false,
       error: 'Manifest description, destination, and shipment status are required.',
     });
   }
 
-  const trk = trackingNumber && trackingNumber.trim() ? trackingNumber.trim().toUpperCase() : `TRK-ARM-${Math.floor(1000 + Math.random() * 9000)}`;
+  const trk = typeof trackingNumber === 'string' && trackingNumber.trim()
+    ? trackingNumber.trim().toUpperCase()
+    : `TRK-ARM-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  if (shipments.some((shipment) =>
+    shipment.id.toUpperCase() === trk || shipment.trackingNumber.toUpperCase() === trk
+  )) {
+    return res.status(409).json({
+      success: false,
+      error: `Shipment with tracking number ${trk} already exists in transit records.`,
+    });
+  }
 
   const newShipment: ShipmentRecord = {
     id: trk,
